@@ -1,13 +1,13 @@
 /********************************************************************************
-** Form generated from reading UI file 'ethercat_sdkXmGRoE.ui'
+** Form generated from reading UI file 'ethercat_sdkcidiYg.ui'
 **
 ** Created by: Qt User Interface Compiler version 5.15.13
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
 ********************************************************************************/
 
-#ifndef ETHERCAT_SDKXMGROE_H
-#define ETHERCAT_SDKXMGROE_H
+#ifndef ETHERCAT_SDKCIDIYG_H
+#define ETHERCAT_SDKCIDIYG_H
 
 #include <QtCore/QVariant>
 #include <QtWidgets/QApplication>
@@ -56,6 +56,66 @@ public:
     QLabel *label_36;
     QLabel *label_37;
     QLabel *label_28;
+    QWidget *gridLayoutWidget_2;
+    QGridLayout *gridLayout_3;
+    QVBoxLayout *verticalLayout_3;
+    QLabel *state_l_20;
+    QLabel *state_l_21;
+    QLabel *state_l_22;
+    QLabel *state_l_23;
+    QLabel *label_34;
+    QLabel *label_39;
+    QLabel *label_38;
+    QVBoxLayout *verticalLayout_6;
+    QLabel *state_r_10;
+    QLabel *state_r_11;
+    QLabel *state_r_12;
+    QLabel *state_r_13;
+    QVBoxLayout *verticalLayout_4;
+    QLabel *state_r_00;
+    QLabel *state_r_01;
+    QLabel *state_r_02;
+    QLabel *state_r_03;
+    QLabel *label_35;
+    QLabel *label_41;
+    QVBoxLayout *verticalLayout_2;
+    QLabel *state_l_10;
+    QLabel *state_l_11;
+    QLabel *state_l_12;
+    QLabel *state_l_13;
+    QVBoxLayout *verticalLayout_7;
+    QLabel *state_r_20;
+    QLabel *state_r_21;
+    QLabel *state_r_22;
+    QLabel *state_r_23;
+    QLabel *label_32;
+    QVBoxLayout *verticalLayout;
+    QLabel *state_l_00;
+    QLabel *state_l_01;
+    QLabel *state_l_02;
+    QLabel *state_l_03;
+    QLabel *label_42;
+    QVBoxLayout *verticalLayout_9;
+    QLabel *state_l_30;
+    QLabel *state_l_31;
+    QLabel *state_l_32;
+    QLabel *state_l_33;
+    QVBoxLayout *verticalLayout_10;
+    QLabel *state_l_40;
+    QLabel *state_l_41;
+    QLabel *state_l_42;
+    QLabel *state_l_43;
+    QVBoxLayout *verticalLayout_11;
+    QLabel *state_r_30;
+    QLabel *state_r_31;
+    QLabel *state_r_32;
+    QLabel *state_r_33;
+    QVBoxLayout *verticalLayout_12;
+    QLabel *state_r_40;
+    QLabel *state_r_41;
+    QLabel *state_r_42;
+    QLabel *state_r_43;
+    QLabel *label_40;
     QWidget *tab_3;
     QFrame *frame;
     QLineEdit *task_file_path;
@@ -225,7 +285,7 @@ public:
         tab->setObjectName(QString::fromUtf8("tab"));
         gridLayoutWidget = new QWidget(tab);
         gridLayoutWidget->setObjectName(QString::fromUtf8("gridLayoutWidget"));
-        gridLayoutWidget->setGeometry(QRect(230, 50, 721, 331));
+        gridLayoutWidget->setGeometry(QRect(230, 30, 721, 331));
         gridLayout_2 = new QGridLayout(gridLayoutWidget);
         gridLayout_2->setObjectName(QString::fromUtf8("gridLayout_2"));
         gridLayout_2->setContentsMargins(0, 0, 0, 0);
@@ -330,7 +390,303 @@ public:
 
         label_28 = new QLabel(tab);
         label_28->setObjectName(QString::fromUtf8("label_28"));
-        label_28->setGeometry(QRect(230, 20, 241, 19));
+        label_28->setGeometry(QRect(230, 10, 241, 19));
+        gridLayoutWidget_2 = new QWidget(tab);
+        gridLayoutWidget_2->setObjectName(QString::fromUtf8("gridLayoutWidget_2"));
+        gridLayoutWidget_2->setGeometry(QRect(90, 390, 921, 301));
+        gridLayout_3 = new QGridLayout(gridLayoutWidget_2);
+        gridLayout_3->setObjectName(QString::fromUtf8("gridLayout_3"));
+        gridLayout_3->setContentsMargins(0, 0, 0, 0);
+        verticalLayout_3 = new QVBoxLayout();
+        verticalLayout_3->setObjectName(QString::fromUtf8("verticalLayout_3"));
+        state_l_20 = new QLabel(gridLayoutWidget_2);
+        state_l_20->setObjectName(QString::fromUtf8("state_l_20"));
+
+        verticalLayout_3->addWidget(state_l_20);
+
+        state_l_21 = new QLabel(gridLayoutWidget_2);
+        state_l_21->setObjectName(QString::fromUtf8("state_l_21"));
+
+        verticalLayout_3->addWidget(state_l_21);
+
+        state_l_22 = new QLabel(gridLayoutWidget_2);
+        state_l_22->setObjectName(QString::fromUtf8("state_l_22"));
+
+        verticalLayout_3->addWidget(state_l_22);
+
+        state_l_23 = new QLabel(gridLayoutWidget_2);
+        state_l_23->setObjectName(QString::fromUtf8("state_l_23"));
+
+        verticalLayout_3->addWidget(state_l_23);
+
+
+        gridLayout_3->addLayout(verticalLayout_3, 2, 3, 1, 1);
+
+        label_34 = new QLabel(gridLayoutWidget_2);
+        label_34->setObjectName(QString::fromUtf8("label_34"));
+
+        gridLayout_3->addWidget(label_34, 3, 0, 1, 1);
+
+        label_39 = new QLabel(gridLayoutWidget_2);
+        label_39->setObjectName(QString::fromUtf8("label_39"));
+
+        gridLayout_3->addWidget(label_39, 2, 0, 1, 1);
+
+        label_38 = new QLabel(gridLayoutWidget_2);
+        label_38->setObjectName(QString::fromUtf8("label_38"));
+
+        gridLayout_3->addWidget(label_38, 1, 3, 1, 1);
+
+        verticalLayout_6 = new QVBoxLayout();
+        verticalLayout_6->setObjectName(QString::fromUtf8("verticalLayout_6"));
+        state_r_10 = new QLabel(gridLayoutWidget_2);
+        state_r_10->setObjectName(QString::fromUtf8("state_r_10"));
+
+        verticalLayout_6->addWidget(state_r_10);
+
+        state_r_11 = new QLabel(gridLayoutWidget_2);
+        state_r_11->setObjectName(QString::fromUtf8("state_r_11"));
+
+        verticalLayout_6->addWidget(state_r_11);
+
+        state_r_12 = new QLabel(gridLayoutWidget_2);
+        state_r_12->setObjectName(QString::fromUtf8("state_r_12"));
+
+        verticalLayout_6->addWidget(state_r_12);
+
+        state_r_13 = new QLabel(gridLayoutWidget_2);
+        state_r_13->setObjectName(QString::fromUtf8("state_r_13"));
+
+        verticalLayout_6->addWidget(state_r_13);
+
+
+        gridLayout_3->addLayout(verticalLayout_6, 3, 2, 1, 1);
+
+        verticalLayout_4 = new QVBoxLayout();
+        verticalLayout_4->setObjectName(QString::fromUtf8("verticalLayout_4"));
+        state_r_00 = new QLabel(gridLayoutWidget_2);
+        state_r_00->setObjectName(QString::fromUtf8("state_r_00"));
+
+        verticalLayout_4->addWidget(state_r_00);
+
+        state_r_01 = new QLabel(gridLayoutWidget_2);
+        state_r_01->setObjectName(QString::fromUtf8("state_r_01"));
+
+        verticalLayout_4->addWidget(state_r_01);
+
+        state_r_02 = new QLabel(gridLayoutWidget_2);
+        state_r_02->setObjectName(QString::fromUtf8("state_r_02"));
+
+        verticalLayout_4->addWidget(state_r_02);
+
+        state_r_03 = new QLabel(gridLayoutWidget_2);
+        state_r_03->setObjectName(QString::fromUtf8("state_r_03"));
+
+        verticalLayout_4->addWidget(state_r_03);
+
+
+        gridLayout_3->addLayout(verticalLayout_4, 3, 1, 1, 1);
+
+        label_35 = new QLabel(gridLayoutWidget_2);
+        label_35->setObjectName(QString::fromUtf8("label_35"));
+
+        gridLayout_3->addWidget(label_35, 1, 2, 1, 1);
+
+        label_41 = new QLabel(gridLayoutWidget_2);
+        label_41->setObjectName(QString::fromUtf8("label_41"));
+
+        gridLayout_3->addWidget(label_41, 1, 4, 1, 1);
+
+        verticalLayout_2 = new QVBoxLayout();
+        verticalLayout_2->setObjectName(QString::fromUtf8("verticalLayout_2"));
+        state_l_10 = new QLabel(gridLayoutWidget_2);
+        state_l_10->setObjectName(QString::fromUtf8("state_l_10"));
+
+        verticalLayout_2->addWidget(state_l_10);
+
+        state_l_11 = new QLabel(gridLayoutWidget_2);
+        state_l_11->setObjectName(QString::fromUtf8("state_l_11"));
+
+        verticalLayout_2->addWidget(state_l_11);
+
+        state_l_12 = new QLabel(gridLayoutWidget_2);
+        state_l_12->setObjectName(QString::fromUtf8("state_l_12"));
+
+        verticalLayout_2->addWidget(state_l_12);
+
+        state_l_13 = new QLabel(gridLayoutWidget_2);
+        state_l_13->setObjectName(QString::fromUtf8("state_l_13"));
+
+        verticalLayout_2->addWidget(state_l_13);
+
+
+        gridLayout_3->addLayout(verticalLayout_2, 2, 2, 1, 1);
+
+        verticalLayout_7 = new QVBoxLayout();
+        verticalLayout_7->setObjectName(QString::fromUtf8("verticalLayout_7"));
+        state_r_20 = new QLabel(gridLayoutWidget_2);
+        state_r_20->setObjectName(QString::fromUtf8("state_r_20"));
+
+        verticalLayout_7->addWidget(state_r_20);
+
+        state_r_21 = new QLabel(gridLayoutWidget_2);
+        state_r_21->setObjectName(QString::fromUtf8("state_r_21"));
+
+        verticalLayout_7->addWidget(state_r_21);
+
+        state_r_22 = new QLabel(gridLayoutWidget_2);
+        state_r_22->setObjectName(QString::fromUtf8("state_r_22"));
+
+        verticalLayout_7->addWidget(state_r_22);
+
+        state_r_23 = new QLabel(gridLayoutWidget_2);
+        state_r_23->setObjectName(QString::fromUtf8("state_r_23"));
+
+        verticalLayout_7->addWidget(state_r_23);
+
+
+        gridLayout_3->addLayout(verticalLayout_7, 3, 3, 1, 1);
+
+        label_32 = new QLabel(gridLayoutWidget_2);
+        label_32->setObjectName(QString::fromUtf8("label_32"));
+
+        gridLayout_3->addWidget(label_32, 1, 1, 1, 1);
+
+        verticalLayout = new QVBoxLayout();
+        verticalLayout->setObjectName(QString::fromUtf8("verticalLayout"));
+        state_l_00 = new QLabel(gridLayoutWidget_2);
+        state_l_00->setObjectName(QString::fromUtf8("state_l_00"));
+
+        verticalLayout->addWidget(state_l_00);
+
+        state_l_01 = new QLabel(gridLayoutWidget_2);
+        state_l_01->setObjectName(QString::fromUtf8("state_l_01"));
+
+        verticalLayout->addWidget(state_l_01);
+
+        state_l_02 = new QLabel(gridLayoutWidget_2);
+        state_l_02->setObjectName(QString::fromUtf8("state_l_02"));
+
+        verticalLayout->addWidget(state_l_02);
+
+        state_l_03 = new QLabel(gridLayoutWidget_2);
+        state_l_03->setObjectName(QString::fromUtf8("state_l_03"));
+
+        verticalLayout->addWidget(state_l_03);
+
+
+        gridLayout_3->addLayout(verticalLayout, 2, 1, 1, 1);
+
+        label_42 = new QLabel(gridLayoutWidget_2);
+        label_42->setObjectName(QString::fromUtf8("label_42"));
+
+        gridLayout_3->addWidget(label_42, 1, 5, 1, 1);
+
+        verticalLayout_9 = new QVBoxLayout();
+        verticalLayout_9->setObjectName(QString::fromUtf8("verticalLayout_9"));
+        state_l_30 = new QLabel(gridLayoutWidget_2);
+        state_l_30->setObjectName(QString::fromUtf8("state_l_30"));
+
+        verticalLayout_9->addWidget(state_l_30);
+
+        state_l_31 = new QLabel(gridLayoutWidget_2);
+        state_l_31->setObjectName(QString::fromUtf8("state_l_31"));
+
+        verticalLayout_9->addWidget(state_l_31);
+
+        state_l_32 = new QLabel(gridLayoutWidget_2);
+        state_l_32->setObjectName(QString::fromUtf8("state_l_32"));
+
+        verticalLayout_9->addWidget(state_l_32);
+
+        state_l_33 = new QLabel(gridLayoutWidget_2);
+        state_l_33->setObjectName(QString::fromUtf8("state_l_33"));
+
+        verticalLayout_9->addWidget(state_l_33);
+
+
+        gridLayout_3->addLayout(verticalLayout_9, 2, 4, 1, 1);
+
+        verticalLayout_10 = new QVBoxLayout();
+        verticalLayout_10->setObjectName(QString::fromUtf8("verticalLayout_10"));
+        state_l_40 = new QLabel(gridLayoutWidget_2);
+        state_l_40->setObjectName(QString::fromUtf8("state_l_40"));
+
+        verticalLayout_10->addWidget(state_l_40);
+
+        state_l_41 = new QLabel(gridLayoutWidget_2);
+        state_l_41->setObjectName(QString::fromUtf8("state_l_41"));
+
+        verticalLayout_10->addWidget(state_l_41);
+
+        state_l_42 = new QLabel(gridLayoutWidget_2);
+        state_l_42->setObjectName(QString::fromUtf8("state_l_42"));
+
+        verticalLayout_10->addWidget(state_l_42);
+
+        state_l_43 = new QLabel(gridLayoutWidget_2);
+        state_l_43->setObjectName(QString::fromUtf8("state_l_43"));
+
+        verticalLayout_10->addWidget(state_l_43);
+
+
+        gridLayout_3->addLayout(verticalLayout_10, 2, 5, 1, 1);
+
+        verticalLayout_11 = new QVBoxLayout();
+        verticalLayout_11->setObjectName(QString::fromUtf8("verticalLayout_11"));
+        state_r_30 = new QLabel(gridLayoutWidget_2);
+        state_r_30->setObjectName(QString::fromUtf8("state_r_30"));
+
+        verticalLayout_11->addWidget(state_r_30);
+
+        state_r_31 = new QLabel(gridLayoutWidget_2);
+        state_r_31->setObjectName(QString::fromUtf8("state_r_31"));
+
+        verticalLayout_11->addWidget(state_r_31);
+
+        state_r_32 = new QLabel(gridLayoutWidget_2);
+        state_r_32->setObjectName(QString::fromUtf8("state_r_32"));
+
+        verticalLayout_11->addWidget(state_r_32);
+
+        state_r_33 = new QLabel(gridLayoutWidget_2);
+        state_r_33->setObjectName(QString::fromUtf8("state_r_33"));
+
+        verticalLayout_11->addWidget(state_r_33);
+
+
+        gridLayout_3->addLayout(verticalLayout_11, 3, 4, 1, 1);
+
+        verticalLayout_12 = new QVBoxLayout();
+        verticalLayout_12->setObjectName(QString::fromUtf8("verticalLayout_12"));
+        state_r_40 = new QLabel(gridLayoutWidget_2);
+        state_r_40->setObjectName(QString::fromUtf8("state_r_40"));
+
+        verticalLayout_12->addWidget(state_r_40);
+
+        state_r_41 = new QLabel(gridLayoutWidget_2);
+        state_r_41->setObjectName(QString::fromUtf8("state_r_41"));
+
+        verticalLayout_12->addWidget(state_r_41);
+
+        state_r_42 = new QLabel(gridLayoutWidget_2);
+        state_r_42->setObjectName(QString::fromUtf8("state_r_42"));
+
+        verticalLayout_12->addWidget(state_r_42);
+
+        state_r_43 = new QLabel(gridLayoutWidget_2);
+        state_r_43->setObjectName(QString::fromUtf8("state_r_43"));
+
+        verticalLayout_12->addWidget(state_r_43);
+
+
+        gridLayout_3->addLayout(verticalLayout_12, 3, 5, 1, 1);
+
+        label_40 = new QLabel(gridLayoutWidget_2);
+        label_40->setObjectName(QString::fromUtf8("label_40"));
+
+        gridLayout_3->addWidget(label_40, 1, 0, 1, 1);
+
         tabWidget->addTab(tab, QString());
         tab_3 = new QWidget();
         tab_3->setObjectName(QString::fromUtf8("tab_3"));
@@ -1128,6 +1484,54 @@ public:
         label_36->setText(QCoreApplication::translate("MainWindow", "kp", nullptr));
         label_37->setText(QCoreApplication::translate("MainWindow", "kd", nullptr));
         label_28->setText(QCoreApplication::translate("MainWindow", "\344\270\212\347\224\265\345\220\216\345\274\200\345\220\257\350\277\207\347\250\213", nullptr));
+        state_l_20->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
+        state_l_21->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
+        state_l_22->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
+        state_l_23->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
+        label_34->setText(QCoreApplication::translate("MainWindow", "right", nullptr));
+        label_39->setText(QCoreApplication::translate("MainWindow", "left", nullptr));
+        label_38->setText(QCoreApplication::translate("MainWindow", "finger2", nullptr));
+        state_r_10->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
+        state_r_11->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
+        state_r_12->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
+        state_r_13->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
+        state_r_00->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
+        state_r_01->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
+        state_r_02->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
+        state_r_03->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
+        label_35->setText(QCoreApplication::translate("MainWindow", "finger1", nullptr));
+        label_41->setText(QCoreApplication::translate("MainWindow", "finger3", nullptr));
+        state_l_10->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
+        state_l_11->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
+        state_l_12->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
+        state_l_13->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
+        state_r_20->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
+        state_r_21->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
+        state_r_22->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
+        state_r_23->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
+        label_32->setText(QCoreApplication::translate("MainWindow", "finger0", nullptr));
+        state_l_00->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
+        state_l_01->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
+        state_l_02->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
+        state_l_03->setText(QCoreApplication::translate("MainWindow", "3:", nullptr));
+        label_42->setText(QCoreApplication::translate("MainWindow", "finger4", nullptr));
+        state_l_30->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
+        state_l_31->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
+        state_l_32->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
+        state_l_33->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
+        state_l_40->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
+        state_l_41->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
+        state_l_42->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
+        state_l_43->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
+        state_r_30->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
+        state_r_31->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
+        state_r_32->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
+        state_r_33->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
+        state_r_40->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
+        state_r_41->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
+        state_r_42->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
+        state_r_43->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
+        label_40->setText(QCoreApplication::translate("MainWindow", "mc_state", nullptr));
         tabWidget->setTabText(tabWidget->indexOf(tab), QCoreApplication::translate("MainWindow", "\350\277\236\346\216\245", nullptr));
         selectFile->setText(QCoreApplication::translate("MainWindow", "\351\200\211\346\213\251\346\226\207\344\273\266", nullptr));
         label_30->setText(QCoreApplication::translate("MainWindow", "\346\222\255\346\224\276\346\211\223\347\202\271\347\232\204\345\212\250\344\275\234\357\274\214\346\226\207\344\273\266\346\240\274\345\274\217.json", nullptr));
@@ -1266,4 +1670,4 @@ namespace Ui {
 
 QT_END_NAMESPACE
 
-#endif // ETHERCAT_SDKXMGROE_H
+#endif // ETHERCAT_SDKCIDIYG_H

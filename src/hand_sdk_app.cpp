@@ -21,6 +21,7 @@ constexpr double kDegToRad = M_PI / 180.0;
 QString mcStateName(hand_sdk::service::McState state)
 {
     switch (state) {
+    case hand_sdk::service::McState::kNone:    return QStringLiteral("none");
     case hand_sdk::service::McState::kInit:    return QStringLiteral("init");
     case hand_sdk::service::McState::kStandby: return QStringLiteral("standby");
     case hand_sdk::service::McState::kActive:  return QStringLiteral("active");
@@ -33,6 +34,103 @@ QString handName(hand_sdk::service::Hand hand)
 {
     return hand == hand_sdk::service::Hand::kLeft ? QStringLiteral("left")
                                                   : QStringLiteral("right");
+}
+
+QString mcStateLabel(hand_sdk::service::McState state)
+{
+    switch (state) {
+    case hand_sdk::service::McState::kNone:    return QStringLiteral("None");
+    case hand_sdk::service::McState::kInit:    return QStringLiteral("Init");
+    case hand_sdk::service::McState::kStandby: return QStringLiteral("Standby");
+    case hand_sdk::service::McState::kActive:  return QStringLiteral("Active");
+    case hand_sdk::service::McState::kFault:   return QStringLiteral("Fault");
+    }
+    return QStringLiteral("Unknown");
+}
+
+QString mcFaultNames(uint32_t code)
+{
+    using namespace hand_sdk::service;
+
+    if (code == fault::kNone) {
+        return QStringLiteral("None");
+    }
+
+    QStringList names;
+    if ((code & fault::kOverCurrent) != 0u) {
+        names << QStringLiteral("OverCurrent");
+    }
+    if ((code & fault::kOverVoltage) != 0u) {
+        names << QStringLiteral("OverVoltage");
+    }
+    if ((code & fault::kUnderVoltage) != 0u) {
+        names << QStringLiteral("UnderVoltage");
+    }
+    if ((code & fault::kStall) != 0u) {
+        names << QStringLiteral("Stall");
+    }
+    if ((code & fault::kOverTemp) != 0u) {
+        names << QStringLiteral("OverTemp");
+    }
+    if ((code & fault::kCurrentZero) != 0u) {
+        names << QStringLiteral("CurrentZero");
+    }
+    if ((code & fault::kPosNotSync) != 0u) {
+        names << QStringLiteral("PosNotSync");
+    }
+    if ((code & fault::kOverSpeed) != 0u) {
+        names << QStringLiteral("OverSpeed");
+    }
+    if ((code & fault::kHardware) != 0u) {
+        names << QStringLiteral("Hardware");
+    }
+
+    constexpr uint32_t kKnownMask =
+        fault::kOverCurrent | fault::kOverVoltage | fault::kUnderVoltage |
+        fault::kStall | fault::kOverTemp | fault::kCurrentZero |
+        fault::kPosNotSync | fault::kOverSpeed | fault::kHardware;
+
+    const uint32_t unknown = code & ~kKnownMask;
+    if (unknown != 0u) {
+        names << QStringLiteral("Unknown(0x%1)").arg(unknown, 0, 16);
+    }
+
+    return names.join(QStringLiteral("|"));
+}
+
+void resetMcLabels(const std::array<QLabel*, kNumUiJoints>& labels)
+{
+    for (std::size_t i = 0; i < kNumUiJoints; ++i) {
+        if (labels[i] != nullptr) {
+            labels[i]->setText(QStringLiteral("%1: ").arg(static_cast<int>(i % 4)));
+        }
+    }
+}
+
+void renderMcLabels(const std::array<QLabel*, kNumUiJoints>& labels,
+                    const hand_sdk::service::McStatusArray& states)
+{
+    for (std::size_t i = 0; i < kNumUiJoints; ++i) {
+        if (labels[i] == nullptr) {
+            continue;
+        }
+
+        const int joint_in_finger = static_cast<int>(i % 4);
+        const auto state = states[i].state;
+        if (static_cast<uint8_t>(state) == 0u) {
+            labels[i]->setText(QStringLiteral("%1: ").arg(joint_in_finger));
+            continue;
+        }
+        if (state == hand_sdk::service::McState::kFault) {
+            labels[i]->setText(QStringLiteral("%1: Fault: %2")
+                                   .arg(joint_in_finger)
+                                   .arg(mcFaultNames(states[i].fault_code)));
+        } else {
+            labels[i]->setText(QStringLiteral("%1: %2")
+                                   .arg(joint_in_finger)
+                                   .arg(mcStateLabel(state)));
+        }
+    }
 }
 
 } // namespace
@@ -68,15 +166,25 @@ void HandAppWindow::cacheJointWidgets()
 {
     for (std::size_t i = 0; i < kNumUiJoints; ++i) {
         const auto index = static_cast<int>(i);
+        const auto finger = static_cast<int>(i / 4);
+        const auto joint  = static_cast<int>(i % 4);
+
         pos_labels_[i] = findChild<QLabel*>(QStringLiteral("readpos%1").arg(index));
         vel_labels_[i] = findChild<QLabel*>(QStringLiteral("readvel%1").arg(index));
         tau_labels_[i] = findChild<QLabel*>(QStringLiteral("readtau%1").arg(index));
         err_labels_[i] = findChild<QLabel*>(QStringLiteral("error%1").arg(index));
+        mc_left_labels_[i] =
+            findChild<QLabel*>(QStringLiteral("state_l_%1%2").arg(finger).arg(joint));
+        mc_right_labels_[i] =
+            findChild<QLabel*>(QStringLiteral("state_r_%1%2").arg(finger).arg(joint));
         cmd_fields_[i] = findChild<QLineEdit*>(QStringLiteral("command_pos%1").arg(index));
         if (cmd_fields_[i] != nullptr) {
             cmd_fields_[i]->setText(QStringLiteral("0.0"));
         }
     }
+
+    resetMcLabels(mc_left_labels_);
+    resetMcLabels(mc_right_labels_);
 }
 
 void HandAppWindow::wireButtons()
@@ -219,6 +327,9 @@ void HandAppWindow::onMcState()
         return;
     }
 
+    resetMcLabels(mc_left_labels_);
+    resetMcLabels(mc_right_labels_);
+
     QStringList parts;
     bool all_ok = true;
     for (const auto hand : presentHands()) {
@@ -228,6 +339,12 @@ void HandAppWindow::onMcState()
             parts << QStringLiteral("%1: %2").arg(handName(hand),
                                                   QString::fromStdString(result.msg));
             continue;
+        }
+
+        if (hand == hand_sdk::service::Hand::kLeft) {
+            renderMcLabels(mc_left_labels_, result.value);
+        } else {
+            renderMcLabels(mc_right_labels_, result.value);
         }
 
         int ready = 0;

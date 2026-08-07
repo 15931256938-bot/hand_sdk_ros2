@@ -78,5 +78,7 @@ private:
     std::array<QLabel*, kNumUiJoints> vel_labels_{};
     std::array<QLabel*, kNumUiJoints> tau_labels_{};
     std::array<QLabel*, kNumUiJoints> err_labels_{};
+    std::array<QLabel*, kNumUiJoints> mc_left_labels_{};
+    std::array<QLabel*, kNumUiJoints> mc_right_labels_{};
     std::array<QLineEdit*, kNumUiJoints> cmd_fields_{};
 };
