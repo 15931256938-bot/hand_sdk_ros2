@@ -8,15 +8,28 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(ament_cmake REQUIRED)
 find_package(hand_sdk REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
 
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "srv/SetGains.srv"
+)
+ament_export_dependencies(rosidl_default_runtime)
+
 add_executable(hand_sdk_ros2_node src/hand_sdk_ros2_node.cpp)
 target_compile_features(hand_sdk_ros2_node PRIVATE cxx_std_17)
 target_link_libraries(hand_sdk_ros2_node hand_sdk::hand_sdk)
 ament_target_dependencies(hand_sdk_ros2_node rclcpp sensor_msgs std_msgs)
+
+# The node uses the service type this same package generates. Interfaces and
+# executables in one package need the typesupport target linked by hand --
+# ament_target_dependencies cannot see a target that does not exist yet at
+# configure time.
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(hand_sdk_ros2_node "${cpp_typesupport_target}")
 
 add_executable(hand_sdk_app src/hand_sdk_app.cpp)
 target_include_directories(hand_sdk_app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)

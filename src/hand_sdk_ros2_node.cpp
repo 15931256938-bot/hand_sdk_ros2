@@ -4,6 +4,8 @@
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <std_msgs/msg/float32_multi_array.hpp>
 
+#include <hand_sdk_ros2/srv/set_gains.hpp>
+
 #include <array>
 #include <algorithm>
 #include <chrono>
@@ -23,6 +25,9 @@ using namespace std::chrono_literals;
 
 constexpr std::size_t kNumSdkJoints = hand_sdk::frames::kNumJoints;
 constexpr std::size_t kNumRosJoints = kNumSdkJoints - 1;
+
+// Loop gains ride the service channel as s16en11 fixed point, so |gain| < 16.
+constexpr float kGainWireLimit = 16.0f;
 
 // ROS exposes only the 20 active joints. The SDK keeps one reserved slot at
 // the end of its 21-element EtherCAT array for future use.
@@ -65,6 +70,8 @@ std::vector<double> toDoubleVector(const std::array<float, kNumSdkJoints>& value
     return result;
 }
 
+using SetGains = hand_sdk_ros2::srv::SetGains;
+
 struct SideState
 {
     bool present{false};
@@ -72,6 +79,7 @@ struct SideState
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr state_pub;
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr command_sub;
     rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr gains_sub;
+    rclcpp::Service<SetGains>::SharedPtr gains_srv;
     hand_sdk::frames::HandCommand command{};
 };
 
@@ -137,6 +145,26 @@ public:
             [this](std_msgs::msg::Float32MultiArray::SharedPtr msg) {
                 onGainsCommand(hand_sdk::service::Hand::kRight, *msg);
             });
+
+        // serviceGains() is a blocking bus round-trip (~10 ms, 100 ms timeout).
+        // Left in the default (mutually exclusive) callback group it would stall
+        // the state timer and joint_command subscription for that long, so the
+        // services get their own group and main() spins multi-threaded. Api is
+        // documented as safe to call from any thread.
+        service_group_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+        left_.gains_srv = create_service<SetGains>(
+            "left/set_gains",
+            [this](const SetGains::Request::SharedPtr request, SetGains::Response::SharedPtr response) {
+                onSetGains(hand_sdk::service::Hand::kLeft, "left", *request, *response);
+            },
+            rclcpp::ServicesQoS(), service_group_);
+        right_.gains_srv = create_service<SetGains>(
+            "right/set_gains",
+            [this](const SetGains::Request::SharedPtr request, SetGains::Response::SharedPtr response) {
+                onSetGains(hand_sdk::service::Hand::kRight, "right", *request, *response);
+            },
+            rclcpp::ServicesQoS(), service_group_);
 
         const double publish_rate_hz = get_parameter("publish_rate_hz").as_double();
         const auto period = std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -228,6 +256,48 @@ private:
         const char* label = (hand == hand_sdk::service::Hand::kLeft) ? "left" : "right";
         RCLCPP_INFO(get_logger(), "%s gains set: kp=%.3f kd=%.3f",
                     label, result.value[0].kp, result.value[0].kd);
+    }
+
+    void onSetGains(hand_sdk::service::Hand hand,
+                    const char* label,
+                    const SetGains::Request& request,
+                    SetGains::Response& response)
+    {
+        if (!sideFor(hand).present) {
+            response.success = false;
+            response.message = std::string(label) + " hand is not present";
+            RCLCPP_WARN(get_logger(), "%s", response.message.c_str());
+            return;
+        }
+
+        // s16en11 on the wire: anything at or past +-16 saturates at the INT16
+        // rail instead of wrapping, so the device would silently take a value
+        // the caller never asked for.
+        if (std::abs(request.kp) >= kGainWireLimit || std::abs(request.kd) >= kGainWireLimit) {
+            RCLCPP_WARN(get_logger(),
+                        "%s gains kp=%.3f kd=%.3f exceed the s16en11 range (+-%.1f) and will saturate",
+                        label, request.kp, request.kd, kGainWireLimit);
+        }
+
+        const auto result = api_->serviceGains(hand, request.kp, request.kd);
+        response.success = result.success;
+        response.message = result.msg;
+
+        if (!result.success) {
+            RCLCPP_WARN(get_logger(), "%s serviceGains failed: %s", label, result.msg.c_str());
+            return;
+        }
+
+        response.kp_readback.reserve(kNumRosJoints);
+        response.kd_readback.reserve(kNumRosJoints);
+        for (std::size_t i = 0; i < kNumRosJoints; ++i) {
+            response.kp_readback.push_back(result.value[i].kp);
+            response.kd_readback.push_back(result.value[i].kd);
+        }
+
+        RCLCPP_INFO(get_logger(), "%s gains set: kp=%.3f kd=%.3f (readback kp=%.3f kd=%.3f)",
+                    label, request.kp, request.kd,
+                    result.value[0].kp, result.value[0].kd);
     }
 
     void publishStates()
@@ -412,6 +482,7 @@ private:
     std::unique_ptr<hand_sdk::Api> api_;
     SideState left_;
     SideState right_;
+    rclcpp::CallbackGroup::SharedPtr service_group_;
     std::mutex command_mutex_;
     std::unordered_map<std::string, std::size_t> joint_name_index_;
     std::vector<std::string> jointNames_ = toVector(kJointNames);
@@ -424,7 +495,12 @@ int main(int argc, char** argv)
 
     try {
         auto node = std::make_shared<HandSdkRos2Node>();
-        rclcpp::spin(node);
+        // Multi-threaded so a blocking set_gains round-trip cannot stall the
+        // state timer or the joint_command path; those stay serialized with
+        // each other in the node's default callback group.
+        rclcpp::executors::MultiThreadedExecutor executor;
+        executor.add_node(node);
+        executor.spin();
     } catch (const std::exception& e) {
         RCLCPP_ERROR(rclcpp::get_logger("hand_sdk_ros2"), "%s", e.what());
         rclcpp::shutdown();

@@ -1,0 +1,14 @@
+# Set the force-mode position-loop gains for one hand (SDK service cmd 14).
+#
+# The gains apply to EVERY joint of the hand -- the device has no per-joint
+# setting. Both are s16en11 on the wire, so the usable range is [-16, 16);
+# values outside it saturate at the INT16 rail rather than wrapping.
+float32 kp      # N*m/rad
+float32 kd      # N*m*s/rad
+---
+bool success
+string message
+# What the device reports back, per joint, in the node's joint order. Empty
+# when the call failed.
+float32[] kp_readback
+float32[] kd_readback
