@@ -339,14 +339,54 @@ private:
         return false;
     }
 
+    bool seedCommandFromState(SideState& side, const char* label)
+    {
+        const double timeout_sec = get_parameter("bringup_timeout_sec").as_double();
+        const auto deadline = std::chrono::steady_clock::now() +
+                              std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                                  std::chrono::duration<double>(timeout_sec));
+
+        while (rclcpp::ok() && std::chrono::steady_clock::now() < deadline) {
+            const auto state = api_->readState();
+            const bool is_left = side.hand == hand_sdk::service::Hand::kLeft;
+            const bool has_side = state.success &&
+                                  (is_left ? state.value.has_left : state.value.has_right);
+
+            if (has_side) {
+                const auto& measured = is_left ? state.value.left : state.value.right;
+                {
+                    std::lock_guard<std::mutex> lock(command_mutex_);
+                    side.command.q = measured.q;
+                    side.command.dq.fill(0.0f);
+                    side.command.tau.fill(0.0f);
+                }
+                sendLatestCommand();
+                RCLCPP_INFO(get_logger(), "%s hold pose seeded from measured state", label);
+                return true;
+            }
+
+            std::this_thread::sleep_for(10ms);
+        }
+
+        RCLCPP_WARN(get_logger(), "%s no state to seed the hold pose from", label);
+        return false;
+    }
+
     bool bringUpSide(SideState& side, const char* label)
     {
         using hand_sdk::service::ComCmd;
         using hand_sdk::service::LoopMode;
 
+        waitForMcReady(side.hand, label);
+
         const auto comm = api_->serviceComm(side.hand, ComCmd::kStartBroadcast);
         if (!comm.success) {
             RCLCPP_WARN(get_logger(), "%s start broadcast failed: %s", label, comm.msg.c_str());
+            return false;
+        }
+
+        // Stay at current after enabling
+        if (!seedCommandFromState(side, label)) {
             return false;
         }
 
@@ -355,8 +395,6 @@ private:
             RCLCPP_WARN(get_logger(), "%s force-control enable failed: %s", label, mode.msg.c_str());
             return false;
         }
-
-        waitForMcReady(side.hand, label);
 
         const double kp = get_parameter("initial_kp").as_double();
         const double kd = get_parameter("initial_kd").as_double();

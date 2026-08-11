@@ -10,7 +10,9 @@
 #include <QStringList>
 #include <QTextEdit>
 
+#include <chrono>
 #include <cmath>
+#include <thread>
 
 namespace
 {
@@ -282,9 +284,74 @@ void HandAppWindow::onComm()
                            : QString::fromStdString(result.msg));
     }
 
+    QString seed_detail;
+    all_ok = seedCommandFromState(seed_detail) && all_ok;
+    parts << seed_detail;
+
     const auto text = parts.join(QStringLiteral(" | "));
     setResult(ui_.result_com, all_ok, text);
     appendLog(QStringLiteral("comm: %1").arg(text));
+}
+
+bool HandAppWindow::seedCommandFromState(QString& detail)
+{
+    using namespace std::chrono_literals;
+
+    // The bus has been cycling since onConnect(), so the first read normally
+    // succeeds; the retries only cover a torn read or a just-started cycle.
+    hand_sdk::frames::DualHandState state{};
+    bool have_state = false;
+    for (int attempt = 0; attempt < 40; ++attempt) {
+        const auto read = api_->readState();
+        if (read.success && (read.value.has_left || read.value.has_right)) {
+            state = read.value;
+            have_state = true;
+            break;
+        }
+        std::this_thread::sleep_for(5ms);
+    }
+
+    if (!have_state) {
+        detail = QStringLiteral("seed: no state to hold");
+        return false;
+    }
+
+    // Per hand, not the shared pose sendPositions() uses: the two hands are in
+    // different poses, and seeding one from the other's would be a lurch.
+    hand_sdk::frames::DualHandCommand command;
+    if (hands_.has_left && state.has_left) {
+        command.has_left = true;
+        command.left.q = state.left.q;  // dq / tau stay zero
+    }
+    if (hands_.has_right && state.has_right) {
+        command.has_right = true;
+        command.right.q = state.right.q;
+    }
+
+    if (!command.has_left && !command.has_right) {
+        detail = QStringLiteral("seed: present hand missing from state");
+        return false;
+    }
+
+    const auto sent = api_->sendCommand(command);
+    if (!sent.success) {
+        detail = QStringLiteral("seed: %1").arg(QString::fromStdString(sent.msg));
+        return false;
+    }
+
+    // Mirror the latched pose into the command fields, so the first "send
+    // fields" of a tuning session continues from the hold pose rather than
+    // jumping to whatever was left in the boxes.
+    const auto& shown = command.has_left ? command.left : command.right;
+    for (std::size_t i = 0; i < kNumUiJoints; ++i) {
+        if (cmd_fields_[i] != nullptr) {
+            cmd_fields_[i]->setText(
+                QString::number(static_cast<double>(shown.q[i]) * kRadToDeg, 'f', 2));
+        }
+    }
+
+    detail = QStringLiteral("hold pose seeded");
+    return true;
 }
 
 void HandAppWindow::onCtrl()

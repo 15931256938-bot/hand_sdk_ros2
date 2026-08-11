@@ -50,6 +50,12 @@ private:
 
     void onConnect();   // button_connect  -> result_connect
     void onComm();      // button_com      -> result_com
+
+    // Latch the measured pose as the standing command, run as part of onComm()
+    // so that it is always in place before onCtrl() enables force control.
+    // `detail` gets the fragment shown in the comm result line.
+    bool seedCommandFromState(QString& detail);
+
     void onCtrl();      // button_ctrl     -> result_ctrl
     void onMcState();   // button_mc_state -> result_mc_state
     void onGains();     // button_kpkd     -> result_kpkd
