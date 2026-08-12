@@ -10,7 +10,6 @@ find_package(hand_sdk REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(std_msgs REQUIRED)
 
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
 
@@ -22,7 +21,7 @@ ament_export_dependencies(rosidl_default_runtime)
 add_executable(hand_sdk_ros2_node src/hand_sdk_ros2_node.cpp)
 target_compile_features(hand_sdk_ros2_node PRIVATE cxx_std_17)
 target_link_libraries(hand_sdk_ros2_node hand_sdk::hand_sdk)
-ament_target_dependencies(hand_sdk_ros2_node rclcpp sensor_msgs std_msgs)
+ament_target_dependencies(hand_sdk_ros2_node rclcpp sensor_msgs)
 
 # The node uses the service type this same package generates. Interfaces and
 # executables in one package need the typesupport target linked by hand --

@@ -2,7 +2,6 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
-#include <std_msgs/msg/float32_multi_array.hpp>
 
 #include <hand_sdk_ros2/srv/set_gains.hpp>
 
@@ -78,7 +77,6 @@ struct SideState
     hand_sdk::service::Hand hand{hand_sdk::service::Hand::kLeft};
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr state_pub;
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr command_sub;
-    rclcpp::Subscription<std_msgs::msg::Float32MultiArray>::SharedPtr gains_sub;
     rclcpp::Service<SetGains>::SharedPtr gains_srv;
     hand_sdk::frames::HandCommand command{};
 };
@@ -133,17 +131,6 @@ public:
             "right/joint_command", 10,
             [this](sensor_msgs::msg::JointState::SharedPtr msg) {
                 onJointCommand(hand_sdk::service::Hand::kRight, *msg);
-            });
-
-        left_.gains_sub = create_subscription<std_msgs::msg::Float32MultiArray>(
-            "left/gains_cmd", 10,
-            [this](std_msgs::msg::Float32MultiArray::SharedPtr msg) {
-                onGainsCommand(hand_sdk::service::Hand::kLeft, *msg);
-            });
-        right_.gains_sub = create_subscription<std_msgs::msg::Float32MultiArray>(
-            "right/gains_cmd", 10,
-            [this](std_msgs::msg::Float32MultiArray::SharedPtr msg) {
-                onGainsCommand(hand_sdk::service::Hand::kRight, *msg);
             });
 
         // serviceGains() is a blocking bus round-trip (~10 ms, 100 ms timeout).
@@ -238,24 +225,6 @@ private:
         }
 
         sendLatestCommand();
-    }
-
-    void onGainsCommand(hand_sdk::service::Hand hand, const std_msgs::msg::Float32MultiArray& msg)
-    {
-        if (msg.data.size() < 2) {
-            RCLCPP_WARN(get_logger(), "gains topic needs two floats: kp, kd");
-            return;
-        }
-
-        const auto result = api_->serviceGains(hand, msg.data[0], msg.data[1]);
-        if (!result.success) {
-            RCLCPP_WARN(get_logger(), "serviceGains failed: %s", result.msg.c_str());
-            return;
-        }
-
-        const char* label = (hand == hand_sdk::service::Hand::kLeft) ? "left" : "right";
-        RCLCPP_INFO(get_logger(), "%s gains set: kp=%.3f kd=%.3f",
-                    label, result.value[0].kp, result.value[0].kd);
     }
 
     void onSetGains(hand_sdk::service::Hand hand,
