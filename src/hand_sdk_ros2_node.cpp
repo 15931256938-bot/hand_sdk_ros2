@@ -5,6 +5,10 @@
 
 #include <hand_sdk_ros2/srv/set_gains.hpp>
 
+#include "hand_sdk_node_board.hpp"
+
+#include <QApplication>
+
 #include <array>
 #include <algorithm>
 #include <chrono>
@@ -83,7 +87,7 @@ struct SideState
 
 } // namespace
 
-class HandSdkRos2Node final : public rclcpp::Node
+class HandSdkRos2Node final : public rclcpp::Node, public BoardSource
 {
 public:
     HandSdkRos2Node()
@@ -96,6 +100,9 @@ public:
         declare_parameter<double>("initial_kp", 3.0);
         declare_parameter<double>("initial_kd", 3.0);
         declare_parameter<double>("bringup_timeout_sec", 5.0);
+        // The diagnostic board comes up with the node. Turn it off for headless
+        // runs -- Qt needs a display and will fail hard without one.
+        declare_parameter<bool>("board", true);
 
         hand_sdk::Config config;
         config.interface_name = get_parameter("interface_name").as_string();
@@ -180,6 +187,23 @@ public:
         if (api_) {
             api_->disconnect();
         }
+    }
+
+    bool boardEnabled() const { return get_parameter("board").as_bool(); }
+
+    // --- BoardSource: what the diagnostic board reads --------------------
+
+    hand_sdk::Api* api() override { return api_.get(); }
+
+    bool present(hand_sdk::service::Hand hand) const override
+    {
+        return sideFor(hand).present;
+    }
+
+    BoardSnapshot snapshot(hand_sdk::service::Hand hand) const override
+    {
+        std::lock_guard<std::mutex> lock(snapshot_mutex_);
+        return hand == hand_sdk::service::Hand::kLeft ? left_snapshot_ : right_snapshot_;
     }
 
 private:
@@ -281,10 +305,30 @@ private:
         const auto stamp = now();
         if (left_.present && state.value.has_left) {
             publishSide(left_.state_pub, stamp, state.value.left);
+            cacheSnapshot(left_snapshot_, state.value.left);
         }
         if (right_.present && state.value.has_right) {
             publishSide(right_.state_pub, stamp, state.value.right);
+            cacheSnapshot(right_snapshot_, state.value.right);
         }
+    }
+
+    // Kept alongside the publish so the board shows exactly what subscribers
+    // got, error bits included -- those ride in every readState() but have no
+    // room in a JointState, so this is the only place they surface.
+    void cacheSnapshot(BoardSnapshot& target, const hand_sdk::frames::HandState& state)
+    {
+        BoardSnapshot fresh;
+        fresh.valid = true;
+        for (std::size_t i = 0; i < kNumRosJoints; ++i) {
+            fresh.q[i] = state.q[i];
+            fresh.dq[i] = state.dq[i];
+            fresh.tau[i] = state.tau[i];
+        }
+        fresh.error_bits = state.error_bits;
+
+        std::lock_guard<std::mutex> lock(snapshot_mutex_);
+        target = fresh;
     }
 
     void publishSide(const rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr& publisher,
@@ -453,6 +497,11 @@ private:
     SideState right_;
     rclcpp::CallbackGroup::SharedPtr service_group_;
     std::mutex command_mutex_;
+
+    // Written by the publish timer, read by the Qt thread.
+    mutable std::mutex snapshot_mutex_;
+    BoardSnapshot left_snapshot_;
+    BoardSnapshot right_snapshot_;
     std::unordered_map<std::string, std::size_t> joint_name_index_;
     std::vector<std::string> jointNames_ = toVector(kJointNames);
     rclcpp::TimerBase::SharedPtr publish_timer_;
@@ -469,13 +518,35 @@ int main(int argc, char** argv)
         // each other in the node's default callback group.
         rclcpp::executors::MultiThreadedExecutor executor;
         executor.add_node(node);
-        executor.spin();
+
+        if (!node->boardEnabled()) {
+            executor.spin();
+            rclcpp::shutdown();
+            return 0;
+        }
+
+        // Qt owns the main thread -- it is the only thread it will build
+        // widgets on -- so ROS spins beside it. Closing the window ends the
+        // node; Ctrl-C ends both, since the executor thread drops out of spin()
+        // on shutdown and quits the Qt loop.
+        QApplication app(argc, argv);
+        HandNodeBoard board(*node);
+        board.show();
+
+        std::thread ros_thread([&executor, &app]() {
+            executor.spin();
+            QMetaObject::invokeMethod(&app, "quit", Qt::QueuedConnection);
+        });
+
+        const int status = app.exec();
+
+        executor.cancel();
+        ros_thread.join();
+        rclcpp::shutdown();
+        return status;
     } catch (const std::exception& e) {
         RCLCPP_ERROR(rclcpp::get_logger("hand_sdk_ros2"), "%s", e.what());
         rclcpp::shutdown();
         return 1;
     }
-
-    rclcpp::shutdown();
-    return 0;
 }

@@ -18,9 +18,15 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 )
 ament_export_dependencies(rosidl_default_runtime)
 
-add_executable(hand_sdk_ros2_node src/hand_sdk_ros2_node.cpp)
+# The node carries the diagnostic board, so it links Qt too. src/ is on the
+# include path for the uic output the board header pulls in.
+add_executable(hand_sdk_ros2_node
+  src/hand_sdk_ros2_node.cpp
+  src/hand_sdk_node_board.cpp
+)
+target_include_directories(hand_sdk_ros2_node PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_features(hand_sdk_ros2_node PRIVATE cxx_std_17)
-target_link_libraries(hand_sdk_ros2_node hand_sdk::hand_sdk)
+target_link_libraries(hand_sdk_ros2_node hand_sdk::hand_sdk Qt5::Widgets)
 ament_target_dependencies(hand_sdk_ros2_node rclcpp sensor_msgs)
 
 # The node uses the service type this same package generates. Interfaces and

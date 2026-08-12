@@ -4,7 +4,7 @@ Two executables built on top of the `hand_sdk` C++ SDK:
 
 | Binary | What it is |
 |---|---|
-| `hand_sdk_ros2_node` | ROS 2 node: publishes joint states, subscribes to joint/gain commands |
+| `hand_sdk_ros2_node` | ROS 2 node: publishes joint states, takes joint/gain commands, and carries a diagnostic board |
 | `hand_sdk_app` | Qt5 GUI: step-by-step bring-up, live readings, manual pose commands |
 
 The rest of this README covers the GUI. It does not use rclcpp, so it runs with
@@ -29,9 +29,65 @@ ros2 service call /left/set_gains hand_sdk_ros2/srv/SetGains "{kp: 3.0, kd: 0.5}
 Gains apply to the whole hand, and the response carries the device's per-joint
 readback. Control mode and per-joint gains are **not** on ROS: mode is a bring-up
 concern the node handles itself, and from ROS the hand is one unit. Both are
-available to C++ callers — `Api::serviceMode()` and `Api::serviceGains()` take a
-`service::JointMask` (default: every joint), so the GUI or a C++ tool can re-tune
-or disable a single motor.
+reachable from C++ — `Api::serviceMode()` and `Api::serviceGains()` take a
+`service::JointMask` (default: every joint) — and from the board below, which is
+where you go to disable one motor.
+
+### The board
+
+The node brings up a diagnostic window with it. It is not a second front end for
+driving the hand: it is there to see what is being published and to take a
+faulted motor out of control.
+
+```bash
+ros2 run hand_sdk_ros2 hand_sdk_ros2_node                    # board comes up
+ros2 run hand_sdk_ros2 hand_sdk_ros2_node --ros-args -p board:=false   # headless
+```
+
+Qt owns the main thread and ROS spins beside it. Closing the window stops the
+node; Ctrl-C stops both.
+
+**states tab** — a 5×4 grid per hand, showing whichever kind of state you last
+asked for (`render_state_type` says which):
+
+| Button | Sends | Shows |
+|---|---|---|
+| `button_mc_state` | cmd 12, read-only | `standby` / `active` / `FAULT`, with decoded fault bits, red if faulted |
+| `button_ctrl_state` | cmd 11 with the ignore word in every slot — asks without writing | `1` enabled / `0` disabled, red when 0 |
+| `ctrl_cmd_enable` / `ctrl_cmd_disable` | cmd 11 for the motor picked by `ctrl_finger_index` + `ctrl_joint_index` | nothing in the grid — a one-line verdict in `ctrl_cmd_result`, green ok / red failed |
+
+The loop mode is not in the cells — everything is force control unless someone
+is debugging — so a joint reporting three-loop is called out in the log instead.
+
+The two write buttons leave the grid alone on purpose: it shows the state you
+last *asked* for, and a write silently repainting it would blur "what I read"
+with "what I just did". Press `ctrl_state` to see the write reflected in the
+grid. Their verdict goes to a `ctrl_cmd_result` label, which the board creates
+under the buttons because the `.ui` has none — add one with that object name and
+the board uses yours instead.
+
+Enable/disable addresses **one motor**: the other nineteen slots carry the
+ignore word, so they keep running untouched. Each call is a ~10 ms bus window on
+the GUI thread, and it fails cleanly if a ROS `set_gains` happens to own the
+service channel at that moment.
+
+> **Safety**: disabling a motor drops it to standby — it stops holding and that
+> finger goes limp. Re-enabling picks up whatever the command holder last had,
+> so make sure a sane pose is being commanded before you re-enable.
+
+**readings tab** — the same 100 Hz samples the node publishes, so the screen and
+`joint_states` never disagree. Positions and velocities in **degrees** (the wire
+is radians), torque in N·m, and `error0-19` as 1/0 per motor.
+
+Those error bits come from `HandState::error_bits`, which rides in every
+`readState()` and has nowhere to go in a `JointState` — the board is currently
+the only place they surface. Note the SDK's own caveat: `notes.md` lists
+"whether the error bits are 1=fault" as assumed rather than confirmed on
+hardware. Nothing acts on them automatically for that reason; the board shows
+them and you decide.
+
+The readings grid has no side selector, so it shows the left hand when present,
+otherwise the right.
 
 ---
 
@@ -42,6 +98,9 @@ cd ~/Documents/ros2_dev_ws
 source /opt/ros/jazzy/setup.bash
 colcon build --packages-select hand_sdk_ros2
 ```
+
+Both binaries need EtherCAT capabilities, so re-run `setcap` (step 1) on
+`hand_sdk_ros2_node` as well as `hand_sdk_app` after every build.
 
 ## 1. Grant the binary EtherCAT permissions
 
@@ -148,6 +207,8 @@ it, and it is safe if triggered twice.
 | `src/hand_sdk_app.cpp` | definitions plus `main()` |
 | `src/hand_sdk_app_ui.cpp` | uic output; a header despite the extension, so it is `#include`d rather than compiled separately |
 | `src/hand_sdk_ros2_node.cpp` | the ROS 2 node |
+| `src/hand_sdk_node_board.hpp/.cpp` | the node's diagnostic board |
+| `src/hand_sdk_node_board_ui.cpp` | uic output for the board; `#include`d, like the app's |
 
 Known limitations: the GUI uses `hand_sdk::Config{}` defaults (interface
 `enp132s0`), and the readings show the left hand when present, since the UI has
