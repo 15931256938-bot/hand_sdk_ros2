@@ -7,8 +7,31 @@ Two executables built on top of the `hand_sdk` C++ SDK:
 | `hand_sdk_ros2_node` | ROS 2 node: publishes joint states, subscribes to joint/gain commands |
 | `hand_sdk_app` | Qt5 GUI: step-by-step bring-up, live readings, manual pose commands |
 
-This README covers the GUI. It does not use rclcpp, so it runs with or without a
-ROS environment.
+The rest of this README covers the GUI. It does not use rclcpp, so it runs with
+or without a ROS environment.
+
+---
+
+## `hand_sdk_ros2_node` interface
+
+| Direction | Name | Type |
+|---|---|---|
+| out | `/<side>/joint_states` | `sensor_msgs/JointState` — q [rad], dq [rad/s], tau [N·m], 100 Hz |
+| in | `/<side>/joint_command` | `sensor_msgs/JointState` — q, dq, tau_ff; written to the bus on arrival |
+| in | `/<side>/set_gains` | `hand_sdk_ros2/SetGains` — force-mode position loop kp/kd |
+
+`<side>` is `left` or `right`.
+
+```bash
+ros2 service call /left/set_gains hand_sdk_ros2/srv/SetGains "{kp: 3.0, kd: 0.5}"
+```
+
+Gains apply to the whole hand, and the response carries the device's per-joint
+readback. Control mode and per-joint gains are **not** on ROS: mode is a bring-up
+concern the node handles itself, and from ROS the hand is one unit. Both are
+available to C++ callers — `Api::serviceMode()` and `Api::serviceGains()` take a
+`service::JointMask` (default: every joint), so the GUI or a C++ tool can re-tune
+or disable a single motor.
 
 ---
 
