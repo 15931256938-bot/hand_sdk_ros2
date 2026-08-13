@@ -1,13 +1,13 @@
 /********************************************************************************
-** Form generated from reading UI file 'ethercat_sdkjoMmun.ui'
+** Form generated from reading UI file 'ethercat_sdkAkBkFF.ui'
 **
 ** Created by: Qt User Interface Compiler version 5.15.13
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
 ********************************************************************************/
 
-#ifndef ETHERCAT_SDKJOMMUN_H
-#define ETHERCAT_SDKJOMMUN_H
+#ifndef ETHERCAT_SDKAKBKFF_H
+#define ETHERCAT_SDKAKBKFF_H
 
 #include <QtCore/QVariant>
 #include <QtWidgets/QApplication>
@@ -37,24 +37,24 @@ public:
     QWidget *tab;
     QWidget *gridLayoutWidget;
     QGridLayout *gridLayout_2;
-    QLabel *result_com;
-    QPushButton *button_connect;
-    QLabel *label_31;
-    QPushButton *button_kpkd;
-    QLabel *result_mc_state;
-    QLineEdit *kp_input;
-    QLabel *label_33;
-    QLabel *label_36;
-    QLabel *result_ctrl;
-    QLabel *label_37;
-    QLabel *result_connect;
-    QLabel *label_4;
     QLineEdit *kd_input;
-    QLabel *result_kpkd;
+    QLabel *label_36;
+    QPushButton *button_kpkd;
+    QLabel *result_connect;
     QLabel *label_29;
     QPushButton *button_ctrl;
-    QPushButton *button_com;
+    QLineEdit *kp_input;
+    QLabel *label_33;
+    QLabel *label_37;
+    QLabel *label_31;
+    QLabel *label_4;
+    QLabel *result_kpkd;
     QPushButton *button_mc_state;
+    QPushButton *button_connect;
+    QPushButton *button_com;
+    QLabel *result_mc_state;
+    QLabel *result_com;
+    QLabel *result_ctrl;
     QLabel *label_28;
     QWidget *gridLayoutWidget_2;
     QGridLayout *gridLayout_3;
@@ -289,45 +289,15 @@ public:
         gridLayout_2 = new QGridLayout(gridLayoutWidget);
         gridLayout_2->setObjectName(QString::fromUtf8("gridLayout_2"));
         gridLayout_2->setContentsMargins(0, 0, 0, 0);
-        result_com = new QLabel(gridLayoutWidget);
-        result_com->setObjectName(QString::fromUtf8("result_com"));
-
-        gridLayout_2->addWidget(result_com, 1, 3, 1, 1);
-
-        button_connect = new QPushButton(gridLayoutWidget);
-        button_connect->setObjectName(QString::fromUtf8("button_connect"));
-
-        gridLayout_2->addWidget(button_connect, 0, 2, 1, 1);
-
-        label_31 = new QLabel(gridLayoutWidget);
-        label_31->setObjectName(QString::fromUtf8("label_31"));
-
-        gridLayout_2->addWidget(label_31, 2, 0, 1, 1);
-
-        button_kpkd = new QPushButton(gridLayoutWidget);
-        button_kpkd->setObjectName(QString::fromUtf8("button_kpkd"));
-
-        gridLayout_2->addWidget(button_kpkd, 5, 2, 1, 1);
-
-        result_mc_state = new QLabel(gridLayoutWidget);
-        result_mc_state->setObjectName(QString::fromUtf8("result_mc_state"));
-
-        gridLayout_2->addWidget(result_mc_state, 3, 3, 1, 1);
-
-        kp_input = new QLineEdit(gridLayoutWidget);
-        kp_input->setObjectName(QString::fromUtf8("kp_input"));
+        kd_input = new QLineEdit(gridLayoutWidget);
+        kd_input->setObjectName(QString::fromUtf8("kd_input"));
         QSizePolicy sizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         sizePolicy.setHorizontalStretch(0);
         sizePolicy.setVerticalStretch(0);
-        sizePolicy.setHeightForWidth(kp_input->sizePolicy().hasHeightForWidth());
-        kp_input->setSizePolicy(sizePolicy);
+        sizePolicy.setHeightForWidth(kd_input->sizePolicy().hasHeightForWidth());
+        kd_input->setSizePolicy(sizePolicy);
 
-        gridLayout_2->addWidget(kp_input, 4, 1, 1, 1);
-
-        label_33 = new QLabel(gridLayoutWidget);
-        label_33->setObjectName(QString::fromUtf8("label_33"));
-
-        gridLayout_2->addWidget(label_33, 3, 0, 1, 1);
+        gridLayout_2->addWidget(kd_input, 5, 1, 1, 1);
 
         label_36 = new QLabel(gridLayoutWidget);
         label_36->setObjectName(QString::fromUtf8("label_36"));
@@ -335,38 +305,15 @@ public:
 
         gridLayout_2->addWidget(label_36, 4, 0, 1, 1);
 
-        result_ctrl = new QLabel(gridLayoutWidget);
-        result_ctrl->setObjectName(QString::fromUtf8("result_ctrl"));
+        button_kpkd = new QPushButton(gridLayoutWidget);
+        button_kpkd->setObjectName(QString::fromUtf8("button_kpkd"));
 
-        gridLayout_2->addWidget(result_ctrl, 2, 3, 1, 1);
-
-        label_37 = new QLabel(gridLayoutWidget);
-        label_37->setObjectName(QString::fromUtf8("label_37"));
-        label_37->setAlignment(Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter);
-
-        gridLayout_2->addWidget(label_37, 5, 0, 1, 1);
+        gridLayout_2->addWidget(button_kpkd, 5, 2, 1, 1);
 
         result_connect = new QLabel(gridLayoutWidget);
         result_connect->setObjectName(QString::fromUtf8("result_connect"));
 
         gridLayout_2->addWidget(result_connect, 0, 3, 1, 1);
-
-        label_4 = new QLabel(gridLayoutWidget);
-        label_4->setObjectName(QString::fromUtf8("label_4"));
-
-        gridLayout_2->addWidget(label_4, 0, 0, 1, 1);
-
-        kd_input = new QLineEdit(gridLayoutWidget);
-        kd_input->setObjectName(QString::fromUtf8("kd_input"));
-        sizePolicy.setHeightForWidth(kd_input->sizePolicy().hasHeightForWidth());
-        kd_input->setSizePolicy(sizePolicy);
-
-        gridLayout_2->addWidget(kd_input, 5, 1, 1, 1);
-
-        result_kpkd = new QLabel(gridLayoutWidget);
-        result_kpkd->setObjectName(QString::fromUtf8("result_kpkd"));
-
-        gridLayout_2->addWidget(result_kpkd, 5, 3, 1, 1);
 
         label_29 = new QLabel(gridLayoutWidget);
         label_29->setObjectName(QString::fromUtf8("label_29"));
@@ -378,22 +325,75 @@ public:
 
         gridLayout_2->addWidget(button_ctrl, 3, 2, 1, 1);
 
-        button_com = new QPushButton(gridLayoutWidget);
-        button_com->setObjectName(QString::fromUtf8("button_com"));
+        kp_input = new QLineEdit(gridLayoutWidget);
+        kp_input->setObjectName(QString::fromUtf8("kp_input"));
+        sizePolicy.setHeightForWidth(kp_input->sizePolicy().hasHeightForWidth());
+        kp_input->setSizePolicy(sizePolicy);
 
-        gridLayout_2->addWidget(button_com, 2, 2, 1, 1);
+        gridLayout_2->addWidget(kp_input, 4, 1, 1, 1);
+
+        label_33 = new QLabel(gridLayoutWidget);
+        label_33->setObjectName(QString::fromUtf8("label_33"));
+
+        gridLayout_2->addWidget(label_33, 3, 0, 1, 1);
+
+        label_37 = new QLabel(gridLayoutWidget);
+        label_37->setObjectName(QString::fromUtf8("label_37"));
+        label_37->setAlignment(Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter);
+
+        gridLayout_2->addWidget(label_37, 5, 0, 1, 1);
+
+        label_31 = new QLabel(gridLayoutWidget);
+        label_31->setObjectName(QString::fromUtf8("label_31"));
+
+        gridLayout_2->addWidget(label_31, 2, 0, 1, 1);
+
+        label_4 = new QLabel(gridLayoutWidget);
+        label_4->setObjectName(QString::fromUtf8("label_4"));
+
+        gridLayout_2->addWidget(label_4, 0, 0, 1, 1);
+
+        result_kpkd = new QLabel(gridLayoutWidget);
+        result_kpkd->setObjectName(QString::fromUtf8("result_kpkd"));
+
+        gridLayout_2->addWidget(result_kpkd, 5, 3, 1, 1);
 
         button_mc_state = new QPushButton(gridLayoutWidget);
         button_mc_state->setObjectName(QString::fromUtf8("button_mc_state"));
 
         gridLayout_2->addWidget(button_mc_state, 1, 2, 1, 1);
 
+        button_connect = new QPushButton(gridLayoutWidget);
+        button_connect->setObjectName(QString::fromUtf8("button_connect"));
+
+        gridLayout_2->addWidget(button_connect, 0, 2, 1, 1);
+
+        button_com = new QPushButton(gridLayoutWidget);
+        button_com->setObjectName(QString::fromUtf8("button_com"));
+
+        gridLayout_2->addWidget(button_com, 2, 2, 1, 1);
+
+        result_mc_state = new QLabel(gridLayoutWidget);
+        result_mc_state->setObjectName(QString::fromUtf8("result_mc_state"));
+
+        gridLayout_2->addWidget(result_mc_state, 1, 3, 1, 1);
+
+        result_com = new QLabel(gridLayoutWidget);
+        result_com->setObjectName(QString::fromUtf8("result_com"));
+
+        gridLayout_2->addWidget(result_com, 2, 3, 1, 1);
+
+        result_ctrl = new QLabel(gridLayoutWidget);
+        result_ctrl->setObjectName(QString::fromUtf8("result_ctrl"));
+
+        gridLayout_2->addWidget(result_ctrl, 3, 3, 1, 1);
+
         label_28 = new QLabel(tab);
         label_28->setObjectName(QString::fromUtf8("label_28"));
         label_28->setGeometry(QRect(230, 10, 241, 19));
         gridLayoutWidget_2 = new QWidget(tab);
         gridLayoutWidget_2->setObjectName(QString::fromUtf8("gridLayoutWidget_2"));
-        gridLayoutWidget_2->setGeometry(QRect(90, 390, 921, 301));
+        gridLayoutWidget_2->setGeometry(QRect(100, 370, 921, 331));
         gridLayout_3 = new QGridLayout(gridLayoutWidget_2);
         gridLayout_3->setObjectName(QString::fromUtf8("gridLayout_3"));
         gridLayout_3->setContentsMargins(0, 0, 0, 0);
@@ -1465,24 +1465,24 @@ public:
     void retranslateUi(QMainWindow *MainWindow)
     {
         MainWindow->setWindowTitle(QCoreApplication::translate("MainWindow", "MainWindow", nullptr));
-        result_com->setText(QString());
-        button_connect->setText(QCoreApplication::translate("MainWindow", "connect", nullptr));
-        label_31->setText(QCoreApplication::translate("MainWindow", "3. set COM broadcast", nullptr));
-        button_kpkd->setText(QCoreApplication::translate("MainWindow", "set kpkd", nullptr));
-        result_mc_state->setText(QString());
-        kp_input->setText(QCoreApplication::translate("MainWindow", "2.0", nullptr));
-        label_33->setText(QCoreApplication::translate("MainWindow", "4. set force control, enable", nullptr));
-        label_36->setText(QCoreApplication::translate("MainWindow", "kp", nullptr));
-        result_ctrl->setText(QString());
-        label_37->setText(QCoreApplication::translate("MainWindow", "kd", nullptr));
-        result_connect->setText(QString());
-        label_4->setText(QCoreApplication::translate("MainWindow", "1. connect, start DC synchron", nullptr));
         kd_input->setText(QCoreApplication::translate("MainWindow", "0.02", nullptr));
-        result_kpkd->setText(QString());
+        label_36->setText(QCoreApplication::translate("MainWindow", "kp", nullptr));
+        button_kpkd->setText(QCoreApplication::translate("MainWindow", "set kpkd", nullptr));
+        result_connect->setText(QString());
         label_29->setText(QCoreApplication::translate("MainWindow", "2. check McState: active/standby", nullptr));
         button_ctrl->setText(QCoreApplication::translate("MainWindow", "set ctrl", nullptr));
-        button_com->setText(QCoreApplication::translate("MainWindow", "set com", nullptr));
+        kp_input->setText(QCoreApplication::translate("MainWindow", "2.0", nullptr));
+        label_33->setText(QCoreApplication::translate("MainWindow", "4. set force control, enable", nullptr));
+        label_37->setText(QCoreApplication::translate("MainWindow", "kd", nullptr));
+        label_31->setText(QCoreApplication::translate("MainWindow", "3. set COM broadcast", nullptr));
+        label_4->setText(QCoreApplication::translate("MainWindow", "1. connect, start DC synchron", nullptr));
+        result_kpkd->setText(QString());
         button_mc_state->setText(QCoreApplication::translate("MainWindow", "mc_state", nullptr));
+        button_connect->setText(QCoreApplication::translate("MainWindow", "connect", nullptr));
+        button_com->setText(QCoreApplication::translate("MainWindow", "set com", nullptr));
+        result_mc_state->setText(QString());
+        result_com->setText(QString());
+        result_ctrl->setText(QString());
         label_28->setText(QCoreApplication::translate("MainWindow", "\344\270\212\347\224\265\345\220\216\345\274\200\345\220\257\350\277\207\347\250\213", nullptr));
         state_l_20->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
         state_l_21->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
@@ -1670,4 +1670,4 @@ namespace Ui {
 
 QT_END_NAMESPACE
 
-#endif // ETHERCAT_SDKJOMMUN_H
+#endif // ETHERCAT_SDKAKBKFF_H

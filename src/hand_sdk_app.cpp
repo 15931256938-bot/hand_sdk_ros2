@@ -10,6 +10,7 @@
 #include <QStringList>
 #include <QTextEdit>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <thread>
@@ -19,6 +20,47 @@ namespace
 
 constexpr double kRadToDeg = 180.0 / M_PI;
 constexpr double kDegToRad = M_PI / 180.0;
+
+// Every position request from the readings tab carries this commanded velocity
+// and a zero feedforward torque. The device closes
+//   tau = kp*(q_d - q) + kd*(dq_d - dq) + tau_ff
+// so a dq_d of zero asks the motor to brake against its own motion for the
+// whole move. Same number, and the same reasoning, as hand_control_lib's
+// motion.default_speed. One knob: change it here.
+constexpr float kCommandVelocity = 0.1f;   // rad/s
+constexpr float kCommandTorqueFf = 0.0f;   // N*m
+
+// How close a gain readback has to be to count as set lives in
+// hand_sdk::Config::service_tolerance -- the SDK judges by it, so this screen
+// does too.
+
+// How many of a hand's motors answered, as a verdict: all of them, some of
+// them, or none.
+Verdict tally(int reached, int total)
+{
+    if (total <= 0) {
+        return Verdict::kFail;   // nothing was even attempted
+    }
+    if (reached >= total) {
+        return Verdict::kPass;
+    }
+    return reached > 0 ? Verdict::kPartial : Verdict::kFail;
+}
+
+bool contains(const std::vector<hand_sdk::service::Hand>& hands, hand_sdk::service::Hand hand)
+{
+    return std::find(hands.begin(), hands.end(), hand) != hands.end();
+}
+
+QString verdictTag(Verdict verdict)
+{
+    switch (verdict) {
+    case Verdict::kPass:    return QStringLiteral("OK");
+    case Verdict::kPartial: return QStringLiteral("PARTIAL");
+    case Verdict::kFail:    return QStringLiteral("FAILED");
+    }
+    return QStringLiteral("?");
+}
 
 QString mcStateName(hand_sdk::service::McState state)
 {
@@ -150,7 +192,9 @@ HandAppWindow::HandAppWindow()
     poll_timer_->setInterval(20);  // 50 Hz
     connect(poll_timer_, &QTimer::timeout, this, [this]() { onPoll(); });
 
-    setResult(ui_.result_connect, false, QStringLiteral("not connected"));
+    // Not a verdict -- nothing has been tried yet.
+    ui_.result_connect->setText(QStringLiteral("not connected"));
+    ui_.result_connect->setStyleSheet(QStringLiteral("color: gray;"));
 }
 
 HandAppWindow::~HandAppWindow()
@@ -211,10 +255,22 @@ void HandAppWindow::appendLog(const QString& text)
     ui_.log->append(QStringLiteral("[%1] %2").arg(stamp, text));
 }
 
-void HandAppWindow::setResult(QLabel* label, bool ok, const QString& text)
+void HandAppWindow::setResult(QLabel* label, Verdict verdict, const QString& text)
 {
     label->setText(text);
-    label->setStyleSheet(ok ? QStringLiteral("color: green;") : QStringLiteral("color: red;"));
+    switch (verdict) {
+    case Verdict::kPass:
+        label->setStyleSheet(QStringLiteral("color: green;"));
+        break;
+    case Verdict::kPartial:
+        // Amber, not red: the step did something, and the next one is worth
+        // pressing.
+        label->setStyleSheet(QStringLiteral("color: #b8860b;"));
+        break;
+    case Verdict::kFail:
+        label->setStyleSheet(QStringLiteral("color: red;"));
+        break;
+    }
 }
 
 std::vector<hand_sdk::service::Hand> HandAppWindow::presentHands() const
@@ -234,7 +290,7 @@ bool HandAppWindow::requireConnected(QLabel* result)
     if (api_ && (hands_.has_left || hands_.has_right)) {
         return true;
     }
-    setResult(result, false, QStringLiteral("connect first"));
+    setResult(result, Verdict::kFail, QStringLiteral("connect first"));
     appendLog(QStringLiteral("rejected: not connected"));
     return false;
 }
@@ -243,16 +299,17 @@ void HandAppWindow::onConnect()
 {
     if (api_) {
         shutdownSdk();
-        setResult(ui_.result_connect, false, QStringLiteral("disconnected"));
+        ui_.result_connect->setText(QStringLiteral("disconnected"));
+        ui_.result_connect->setStyleSheet(QStringLiteral("color: gray;"));
         appendLog(QStringLiteral("disconnected"));
         return;
     }
 
-    api_ = std::make_unique<hand_sdk::Api>(hand_sdk::Config{});
+    api_ = std::make_unique<hand_sdk::Api>(config_);
     const auto connected = api_->connect();
     if (!connected.success) {
         api_.reset();
-        setResult(ui_.result_connect, false, QString::fromStdString(connected.msg));
+        setResult(ui_.result_connect, Verdict::kFail, QString::fromStdString(connected.msg));
         appendLog(QStringLiteral("connect failed: %1").arg(QString::fromStdString(connected.msg)));
         return;
     }
@@ -262,7 +319,9 @@ void HandAppWindow::onConnect()
                              .arg(hands_.has_left ? QStringLiteral("yes") : QStringLiteral("no"),
                                   hands_.has_right ? QStringLiteral("yes") : QStringLiteral("no"),
                                   api_->dcActive() ? QStringLiteral("armed") : QStringLiteral("off"));
-    setResult(ui_.result_connect, true, summary);
+    // One hand on the bus is a normal rig, not a half-failure, so this stays a
+    // plain pass whenever the bus answered at all.
+    setResult(ui_.result_connect, Verdict::kPass, summary);
     appendLog(QStringLiteral("connected: %1").arg(summary));
     poll_timer_->start();
 }
@@ -273,29 +332,60 @@ void HandAppWindow::onComm()
         return;
     }
 
-    QStringList parts;
-    bool all_ok = true;
-    for (const auto hand : presentHands()) {
-        const auto result = api_->serviceComm(hand, hand_sdk::service::ComCmd::kStartBroadcast);
-        all_ok = all_ok && result.success;
-        parts << QStringLiteral("%1: %2").arg(
-            handName(hand),
-            result.success ? QStringLiteral("broadcast on")
-                           : QString::fromStdString(result.msg));
+    const auto hands = presentHands();
+    std::vector<hand_sdk::service::Hand> started;
+    std::vector<QString> notes(hands.size());
+
+    for (std::size_t i = 0; i < hands.size(); ++i) {
+        // The SDK's message either way: on a pass it says how many motors
+        // echoed the command, on a failure which ones did not.
+        const auto result = api_->serviceComm(hands[i], hand_sdk::service::ComCmd::kStartBroadcast);
+        if (result.success) {
+            started.push_back(hands[i]);
+        }
+        notes[i] = QString::fromStdString(result.msg);
     }
 
+    // Seeding runs on every present hand, whatever the broadcast step did: a
+    // hand that is already listening from an earlier run still needs a pose
+    // latched, and getting one costs nothing if it is not.
     QString seed_detail;
-    all_ok = seedCommandFromState(seed_detail) && all_ok;
-    parts << seed_detail;
+    const auto seeded = seedCommandFromState(hands, seed_detail);
 
-    const auto text = parts.join(QStringLiteral(" | "));
-    setResult(ui_.result_com, all_ok, text);
+    int passed = 0;
+    QStringList parts;
+    for (std::size_t i = 0; i < hands.size(); ++i) {
+        const bool did_start = contains(started, hands[i]);
+        const bool did_seed = contains(seeded, hands[i]);
+        if (did_start && did_seed) {
+            ++passed;
+        }
+        // Both halves always shown, so "broadcast on, NOT seeded" and "timed
+        // out, seeded" are told apart at a glance. Only a hand with both counts
+        // as passed.
+        parts << QStringLiteral("%1: %2, %3")
+                     .arg(handName(hands[i]), notes[i],
+                          did_seed ? QStringLiteral("seeded") : QStringLiteral("NOT seeded"));
+    }
+
+    // One hand broadcasting and holding its pose is enough to go on with; that
+    // hand can be driven while the other is looked at.
+    const auto verdict = tally(passed, static_cast<int>(hands.size()));
+    const auto text = QStringLiteral("%1 | %2 | %3")
+                          .arg(verdictTag(verdict), parts.join(QStringLiteral(" | ")), seed_detail);
+    setResult(ui_.result_com, verdict, text);
     appendLog(QStringLiteral("comm: %1").arg(text));
 }
 
-bool HandAppWindow::seedCommandFromState(QString& detail)
+std::vector<hand_sdk::service::Hand> HandAppWindow::seedCommandFromState(
+    const std::vector<hand_sdk::service::Hand>& hands, QString& detail)
 {
     using namespace std::chrono_literals;
+
+    if (hands.empty()) {
+        detail = QStringLiteral("seed: skipped, no hand to seed");
+        return {};
+    }
 
     // The bus has been cycling since onConnect(), so the first read normally
     // succeeds; the retries only cover a torn read or a just-started cycle.
@@ -313,30 +403,36 @@ bool HandAppWindow::seedCommandFromState(QString& detail)
 
     if (!have_state) {
         detail = QStringLiteral("seed: no state to hold");
-        return false;
+        return {};
     }
 
     // Per hand, not the shared pose sendPositions() uses: the two hands are in
     // different poses, and seeding one from the other's would be a lurch.
     hand_sdk::frames::DualHandCommand command;
-    if (hands_.has_left && state.has_left) {
-        command.has_left = true;
-        command.left.q = state.left.q;  // dq / tau stay zero
-    }
-    if (hands_.has_right && state.has_right) {
-        command.has_right = true;
-        command.right.q = state.right.q;
+    std::vector<hand_sdk::service::Hand> seeded;
+    for (const auto hand : hands) {
+        if (hand == hand_sdk::service::Hand::kLeft && state.has_left) {
+            command.has_left = true;
+            command.left.q = state.left.q;  // dq / tau stay zero
+            seeded.push_back(hand);
+        } else if (hand == hand_sdk::service::Hand::kRight && state.has_right) {
+            command.has_right = true;
+            command.right.q = state.right.q;
+            seeded.push_back(hand);
+        }
     }
 
-    if (!command.has_left && !command.has_right) {
-        detail = QStringLiteral("seed: present hand missing from state");
-        return false;
+    if (seeded.empty()) {
+        detail = QStringLiteral("seed: hand missing from state");
+        return {};
     }
 
+    // One write covers both sides, so a failure here un-seeds every hand in it
+    // rather than leaving some of them claimed.
     const auto sent = api_->sendCommand(command);
     if (!sent.success) {
         detail = QStringLiteral("seed: %1").arg(QString::fromStdString(sent.msg));
-        return false;
+        return {};
     }
 
     // Mirror the latched pose into the command fields, so the first "send
@@ -350,8 +446,12 @@ bool HandAppWindow::seedCommandFromState(QString& detail)
         }
     }
 
-    detail = QStringLiteral("hold pose seeded");
-    return true;
+    QStringList names;
+    for (const auto hand : seeded) {
+        names << handName(hand);
+    }
+    detail = QStringLiteral("hold pose seeded (%1)").arg(names.join(QLatin1Char(',')));
+    return seeded;
 }
 
 void HandAppWindow::onCtrl()
@@ -360,31 +460,28 @@ void HandAppWindow::onCtrl()
         return;
     }
 
+    const auto hands = presentHands();
     QStringList parts;
-    bool all_ok = true;
-    for (const auto hand : presentHands()) {
-        const auto result = api_->serviceMode(hand, hand_sdk::service::LoopMode::kForceControl, true);
-        all_ok = all_ok && result.success;
-        if (!result.success) {
-            parts << QStringLiteral("%1: %2").arg(handName(hand),
-                                                  QString::fromStdString(result.msg));
-            continue;
-        }
+    int enabled_total = 0;
 
-        int enabled = 0;
-        for (std::size_t i = 0; i < kNumUiJoints; ++i) {
-            if (result.value[i].enabled) {
-                ++enabled;
+    for (const auto hand : hands) {
+        const auto result = api_->serviceMode(hand, hand_sdk::service::LoopMode::kForceControl,
+                                              true, hand_sdk::service::JointMask::active());
+
+        for (std::size_t i = 0; i < hand_sdk::frames::kNumActiveJoints; ++i) {
+            if (hand_sdk::service::took(result.value[i],
+                                        hand_sdk::service::LoopMode::kForceControl, true)) {
+                ++enabled_total;
             }
         }
-        parts << QStringLiteral("%1: force-ctrl %2/%3 enabled")
-                     .arg(handName(hand))
-                     .arg(enabled)
-                     .arg(static_cast<int>(kNumUiJoints));
+        parts << QStringLiteral("%1: %2").arg(handName(hand),
+                                              QString::fromStdString(result.msg));
     }
 
-    const auto text = parts.join(QStringLiteral(" | "));
-    setResult(ui_.result_ctrl, all_ok, text);
+    const auto verdict =
+        tally(enabled_total, static_cast<int>(hands.size() * hand_sdk::frames::kNumActiveJoints));
+    const auto text = QStringLiteral("%1 | %2").arg(verdictTag(verdict), parts.join(QStringLiteral(" | ")));
+    setResult(ui_.result_ctrl, verdict, text);
     appendLog(QStringLiteral("ctrl: %1").arg(text));
 }
 
@@ -397,11 +494,12 @@ void HandAppWindow::onMcState()
     resetMcLabels(mc_left_labels_);
     resetMcLabels(mc_right_labels_);
 
+    const auto hands = presentHands();
     QStringList parts;
-    bool all_ok = true;
-    for (const auto hand : presentHands()) {
+    int ready_total = 0;
+
+    for (const auto hand : hands) {
         const auto result = api_->serviceMcState(hand);
-        all_ok = all_ok && result.success;
         if (!result.success) {
             parts << QStringLiteral("%1: %2").arg(handName(hand),
                                                   QString::fromStdString(result.msg));
@@ -429,8 +527,7 @@ void HandAppWindow::onMcState()
             }
         }
 
-        const bool hand_ok = ready == static_cast<int>(kNumUiJoints);
-        all_ok = all_ok && hand_ok;
+        ready_total += ready;
         parts << QStringLiteral("%1: ready %2/%3%4")
                      .arg(handName(hand))
                      .arg(ready)
@@ -440,8 +537,11 @@ void HandAppWindow::onMcState()
                               : QStringLiteral(" [%1]").arg(faults.join(QLatin1Char(','))));
     }
 
-    const auto text = parts.join(QStringLiteral(" | "));
-    setResult(ui_.result_mc_state, all_ok, text);
+    // One motor in standby is enough to carry on with: the rest of the bring-up
+    // will simply do nothing for the motors that are not there.
+    const auto verdict = tally(ready_total, static_cast<int>(hands.size() * kNumUiJoints));
+    const auto text = QStringLiteral("%1 | %2").arg(verdictTag(verdict), parts.join(QStringLiteral(" | ")));
+    setResult(ui_.result_mc_state, verdict, text);
     appendLog(QStringLiteral("mc-state: %1").arg(text));
 }
 
@@ -456,26 +556,34 @@ void HandAppWindow::onGains()
     const double kp = ui_.kp_input->text().toDouble(&kp_ok);
     const double kd = ui_.kd_input->text().toDouble(&kd_ok);
     if (!kp_ok || !kd_ok) {
-        setResult(ui_.result_kpkd, false, QStringLiteral("kp/kd must be numbers"));
+        setResult(ui_.result_kpkd, Verdict::kFail, QStringLiteral("kp/kd must be numbers"));
         return;
     }
 
+    const auto hands = presentHands();
     QStringList parts;
-    bool all_ok = true;
-    for (const auto hand : presentHands()) {
-        const auto result = api_->serviceGains(hand, static_cast<float>(kp), static_cast<float>(kd));
-        all_ok = all_ok && result.success;
-        parts << (result.success
-                      ? QStringLiteral("%1: kp=%2 kd=%3")
-                            .arg(handName(hand))
-                            .arg(static_cast<double>(result.value[0].kp), 0, 'f', 3)
-                            .arg(static_cast<double>(result.value[0].kd), 0, 'f', 3)
-                      : QStringLiteral("%1: %2").arg(handName(hand),
-                                                     QString::fromStdString(result.msg)));
+    int set_total = 0;
+
+    for (const auto hand : hands) {
+        const auto result = api_->serviceGains(hand, static_cast<float>(kp), static_cast<float>(kd),
+                                               hand_sdk::service::JointMask::active());
+
+        // Counted with the SDK's own tolerance, so the verdict on screen and the
+        // one in the message are the same judgement.
+        for (std::size_t i = 0; i < hand_sdk::frames::kNumActiveJoints; ++i) {
+            if (hand_sdk::service::took(result.value[i], static_cast<float>(kp),
+                                        static_cast<float>(kd), config_.service_tolerance)) {
+                ++set_total;
+            }
+        }
+        parts << QStringLiteral("%1: %2").arg(handName(hand),
+                                              QString::fromStdString(result.msg));
     }
 
-    const auto text = parts.join(QStringLiteral(" | "));
-    setResult(ui_.result_kpkd, all_ok, text);
+    const auto verdict =
+        tally(set_total, static_cast<int>(hands.size() * hand_sdk::frames::kNumActiveJoints));
+    const auto text = QStringLiteral("%1 | %2").arg(verdictTag(verdict), parts.join(QStringLiteral(" | ")));
+    setResult(ui_.result_kpkd, verdict, text);
     appendLog(QStringLiteral("gains: %1").arg(text));
 }
 
@@ -510,8 +618,10 @@ void HandAppWindow::onPoll()
                 QString::number(static_cast<double>(hand_state.tau[i]), 'f', 3));
         }
         if (err_labels_[i] != nullptr) {
+            // 1 faulted, 0 healthy -- the same 1/0 the node's board shows, so
+            // an empty cell always means "not read", never "no fault".
             const bool faulted = (hand_state.error_bits & (1u << i)) != 0u;
-            err_labels_[i]->setText(faulted ? QStringLiteral("ERR") : QString());
+            err_labels_[i]->setText(faulted ? QStringLiteral("1") : QStringLiteral("0"));
             err_labels_[i]->setStyleSheet(faulted ? QStringLiteral("color: red;") : QString());
         }
     }
@@ -541,6 +651,8 @@ void HandAppWindow::sendPositions(const std::array<float, kNumUiJoints>& positio
     hand_sdk::frames::HandCommand hand_command{};
     for (std::size_t i = 0; i < kNumUiJoints; ++i) {
         hand_command.q[i] = positions_rad[i];
+        hand_command.dq[i] = kCommandVelocity;
+        hand_command.tau[i] = kCommandTorqueFf;
     }
 
     if (hands_.has_left) {
@@ -554,7 +666,10 @@ void HandAppWindow::sendPositions(const std::array<float, kNumUiJoints>& positio
 
     const auto result = api_->sendCommand(command);
     appendLog(result.success
-                  ? QStringLiteral("%1 sent").arg(label)
+                  ? QStringLiteral("%1 sent (dq=%2 deg/s, tau_ff=%3)")
+                        .arg(label)
+                        .arg(static_cast<double>(kCommandVelocity) * kRadToDeg, 0, 'f', 1)
+                        .arg(static_cast<double>(kCommandTorqueFf), 0, 'f', 3)
                   : QStringLiteral("%1 failed: %2").arg(label, QString::fromStdString(result.msg)));
 }
 
