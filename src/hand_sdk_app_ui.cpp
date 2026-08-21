@@ -1,16 +1,17 @@
 /********************************************************************************
-** Form generated from reading UI file 'ethercat_sdkAkBkFF.ui'
+** Form generated from reading UI file 'ethercat_sdkwpeGJT.ui'
 **
 ** Created by: Qt User Interface Compiler version 5.15.13
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
 ********************************************************************************/
 
-#ifndef ETHERCAT_SDKAKBKFF_H
-#define ETHERCAT_SDKAKBKFF_H
+#ifndef ETHERCAT_SDKWPEGJT_H
+#define ETHERCAT_SDKWPEGJT_H
 
 #include <QtCore/QVariant>
 #include <QtWidgets/QApplication>
+#include <QtWidgets/QCheckBox>
 #include <QtWidgets/QFrame>
 #include <QtWidgets/QGridLayout>
 #include <QtWidgets/QLabel>
@@ -58,48 +59,57 @@ public:
     QLabel *label_28;
     QWidget *gridLayoutWidget_2;
     QGridLayout *gridLayout_3;
-    QVBoxLayout *verticalLayout_3;
-    QLabel *state_l_20;
-    QLabel *state_l_21;
-    QLabel *state_l_22;
-    QLabel *state_l_23;
-    QLabel *label_34;
-    QLabel *label_39;
-    QLabel *label_38;
-    QVBoxLayout *verticalLayout_6;
-    QLabel *state_r_10;
-    QLabel *state_r_11;
-    QLabel *state_r_12;
-    QLabel *state_r_13;
-    QVBoxLayout *verticalLayout_4;
-    QLabel *state_r_00;
-    QLabel *state_r_01;
-    QLabel *state_r_02;
-    QLabel *state_r_03;
-    QLabel *label_35;
-    QLabel *label_41;
+    QVBoxLayout *verticalLayout_21;
+    QCheckBox *calib_l_20;
+    QCheckBox *calib_l_21;
+    QCheckBox *calib_l_22;
+    QCheckBox *calib_l_23;
     QVBoxLayout *verticalLayout_2;
     QLabel *state_l_10;
     QLabel *state_l_11;
     QLabel *state_l_12;
     QLabel *state_l_13;
-    QVBoxLayout *verticalLayout_7;
-    QLabel *state_r_20;
-    QLabel *state_r_21;
-    QLabel *state_r_22;
-    QLabel *state_r_23;
-    QLabel *label_32;
+    QLabel *label_39;
+    QVBoxLayout *verticalLayout_12;
+    QLabel *state_r_40;
+    QLabel *state_r_41;
+    QLabel *state_r_42;
+    QLabel *state_r_43;
+    QLabel *label_38;
+    QLabel *label_40;
+    QVBoxLayout *verticalLayout_14;
+    QCheckBox *calib_l_10;
+    QCheckBox *calib_l_11;
+    QCheckBox *calib_l_12;
+    QCheckBox *calib_l_13;
+    QVBoxLayout *verticalLayout_23;
+    QCheckBox *calib_l_40;
+    QCheckBox *calib_l_41;
+    QCheckBox *calib_l_42;
+    QCheckBox *calib_l_43;
+    QVBoxLayout *verticalLayout_22;
+    QCheckBox *calib_l_30;
+    QCheckBox *calib_l_31;
+    QCheckBox *calib_l_32;
+    QCheckBox *calib_l_33;
+    QLabel *label_41;
+    QVBoxLayout *verticalLayout_4;
+    QLabel *state_r_00;
+    QLabel *state_r_01;
+    QLabel *state_r_02;
+    QLabel *state_r_03;
     QVBoxLayout *verticalLayout;
     QLabel *state_l_00;
     QLabel *state_l_01;
     QLabel *state_l_02;
     QLabel *state_l_03;
-    QLabel *label_42;
-    QVBoxLayout *verticalLayout_9;
-    QLabel *state_l_30;
-    QLabel *state_l_31;
-    QLabel *state_l_32;
-    QLabel *state_l_33;
+    QLabel *label_34;
+    QVBoxLayout *verticalLayout_3;
+    QLabel *state_l_20;
+    QLabel *state_l_21;
+    QLabel *state_l_22;
+    QLabel *state_l_23;
+    QLabel *label_32;
     QVBoxLayout *verticalLayout_10;
     QLabel *state_l_40;
     QLabel *state_l_41;
@@ -110,12 +120,55 @@ public:
     QLabel *state_r_31;
     QLabel *state_r_32;
     QLabel *state_r_33;
-    QVBoxLayout *verticalLayout_12;
-    QLabel *state_r_40;
-    QLabel *state_r_41;
-    QLabel *state_r_42;
-    QLabel *state_r_43;
-    QLabel *label_40;
+    QVBoxLayout *verticalLayout_7;
+    QLabel *state_r_20;
+    QLabel *state_r_21;
+    QLabel *state_r_22;
+    QLabel *state_r_23;
+    QVBoxLayout *verticalLayout_9;
+    QLabel *state_l_30;
+    QLabel *state_l_31;
+    QLabel *state_l_32;
+    QLabel *state_l_33;
+    QLabel *label_35;
+    QVBoxLayout *verticalLayout_13;
+    QCheckBox *calib_l_00;
+    QCheckBox *calib_l_01;
+    QCheckBox *calib_l_02;
+    QCheckBox *calib_l_03;
+    QVBoxLayout *verticalLayout_6;
+    QLabel *state_r_10;
+    QLabel *state_r_11;
+    QLabel *state_r_12;
+    QLabel *state_r_13;
+    QLabel *label_42;
+    QVBoxLayout *verticalLayout_15;
+    QCheckBox *calib_r_00;
+    QCheckBox *calib_r_01;
+    QCheckBox *calib_r_02;
+    QCheckBox *calib_r_03;
+    QVBoxLayout *verticalLayout_16;
+    QCheckBox *calib_r_10;
+    QCheckBox *calib_r_11;
+    QCheckBox *calib_r_12;
+    QCheckBox *calib_r_13;
+    QVBoxLayout *verticalLayout_17;
+    QCheckBox *calib_r_20;
+    QCheckBox *calib_r_21;
+    QCheckBox *calib_r_22;
+    QCheckBox *calib_r_23;
+    QVBoxLayout *verticalLayout_18;
+    QCheckBox *calib_r_30;
+    QCheckBox *calib_r_31;
+    QCheckBox *calib_r_32;
+    QCheckBox *calib_r_33;
+    QVBoxLayout *verticalLayout_19;
+    QCheckBox *calib_r_40;
+    QCheckBox *calib_r_41;
+    QCheckBox *calib_r_42;
+    QCheckBox *calib_r_43;
+    QLabel *label_43;
+    QPushButton *calib_refresh;
     QWidget *tab_3;
     QFrame *frame;
     QLineEdit *task_file_path;
@@ -285,7 +338,7 @@ public:
         tab->setObjectName(QString::fromUtf8("tab"));
         gridLayoutWidget = new QWidget(tab);
         gridLayoutWidget->setObjectName(QString::fromUtf8("gridLayoutWidget"));
-        gridLayoutWidget->setGeometry(QRect(230, 30, 721, 331));
+        gridLayoutWidget->setGeometry(QRect(230, 10, 721, 331));
         gridLayout_2 = new QGridLayout(gridLayoutWidget);
         gridLayout_2->setObjectName(QString::fromUtf8("gridLayout_2"));
         gridLayout_2->setContentsMargins(0, 0, 0, 0);
@@ -390,77 +443,183 @@ public:
 
         label_28 = new QLabel(tab);
         label_28->setObjectName(QString::fromUtf8("label_28"));
-        label_28->setGeometry(QRect(230, 10, 241, 19));
+        label_28->setGeometry(QRect(90, 40, 111, 19));
         gridLayoutWidget_2 = new QWidget(tab);
         gridLayoutWidget_2->setObjectName(QString::fromUtf8("gridLayoutWidget_2"));
-        gridLayoutWidget_2->setGeometry(QRect(100, 370, 921, 331));
+        gridLayoutWidget_2->setGeometry(QRect(10, 350, 1131, 351));
         gridLayout_3 = new QGridLayout(gridLayoutWidget_2);
         gridLayout_3->setObjectName(QString::fromUtf8("gridLayout_3"));
         gridLayout_3->setContentsMargins(0, 0, 0, 0);
-        verticalLayout_3 = new QVBoxLayout();
-        verticalLayout_3->setObjectName(QString::fromUtf8("verticalLayout_3"));
-        state_l_20 = new QLabel(gridLayoutWidget_2);
-        state_l_20->setObjectName(QString::fromUtf8("state_l_20"));
+        verticalLayout_21 = new QVBoxLayout();
+        verticalLayout_21->setObjectName(QString::fromUtf8("verticalLayout_21"));
+        calib_l_20 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_20->setObjectName(QString::fromUtf8("calib_l_20"));
 
-        verticalLayout_3->addWidget(state_l_20);
+        verticalLayout_21->addWidget(calib_l_20);
 
-        state_l_21 = new QLabel(gridLayoutWidget_2);
-        state_l_21->setObjectName(QString::fromUtf8("state_l_21"));
+        calib_l_21 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_21->setObjectName(QString::fromUtf8("calib_l_21"));
 
-        verticalLayout_3->addWidget(state_l_21);
+        verticalLayout_21->addWidget(calib_l_21);
 
-        state_l_22 = new QLabel(gridLayoutWidget_2);
-        state_l_22->setObjectName(QString::fromUtf8("state_l_22"));
+        calib_l_22 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_22->setObjectName(QString::fromUtf8("calib_l_22"));
 
-        verticalLayout_3->addWidget(state_l_22);
+        verticalLayout_21->addWidget(calib_l_22);
 
-        state_l_23 = new QLabel(gridLayoutWidget_2);
-        state_l_23->setObjectName(QString::fromUtf8("state_l_23"));
+        calib_l_23 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_23->setObjectName(QString::fromUtf8("calib_l_23"));
 
-        verticalLayout_3->addWidget(state_l_23);
+        verticalLayout_21->addWidget(calib_l_23);
 
 
-        gridLayout_3->addLayout(verticalLayout_3, 2, 3, 1, 1);
+        gridLayout_3->addLayout(verticalLayout_21, 2, 6, 1, 1);
 
-        label_34 = new QLabel(gridLayoutWidget_2);
-        label_34->setObjectName(QString::fromUtf8("label_34"));
+        verticalLayout_2 = new QVBoxLayout();
+        verticalLayout_2->setObjectName(QString::fromUtf8("verticalLayout_2"));
+        state_l_10 = new QLabel(gridLayoutWidget_2);
+        state_l_10->setObjectName(QString::fromUtf8("state_l_10"));
 
-        gridLayout_3->addWidget(label_34, 3, 0, 1, 1);
+        verticalLayout_2->addWidget(state_l_10);
+
+        state_l_11 = new QLabel(gridLayoutWidget_2);
+        state_l_11->setObjectName(QString::fromUtf8("state_l_11"));
+
+        verticalLayout_2->addWidget(state_l_11);
+
+        state_l_12 = new QLabel(gridLayoutWidget_2);
+        state_l_12->setObjectName(QString::fromUtf8("state_l_12"));
+
+        verticalLayout_2->addWidget(state_l_12);
+
+        state_l_13 = new QLabel(gridLayoutWidget_2);
+        state_l_13->setObjectName(QString::fromUtf8("state_l_13"));
+
+        verticalLayout_2->addWidget(state_l_13);
+
+
+        gridLayout_3->addLayout(verticalLayout_2, 2, 3, 1, 1);
 
         label_39 = new QLabel(gridLayoutWidget_2);
         label_39->setObjectName(QString::fromUtf8("label_39"));
 
         gridLayout_3->addWidget(label_39, 2, 0, 1, 1);
 
+        verticalLayout_12 = new QVBoxLayout();
+        verticalLayout_12->setObjectName(QString::fromUtf8("verticalLayout_12"));
+        state_r_40 = new QLabel(gridLayoutWidget_2);
+        state_r_40->setObjectName(QString::fromUtf8("state_r_40"));
+
+        verticalLayout_12->addWidget(state_r_40);
+
+        state_r_41 = new QLabel(gridLayoutWidget_2);
+        state_r_41->setObjectName(QString::fromUtf8("state_r_41"));
+
+        verticalLayout_12->addWidget(state_r_41);
+
+        state_r_42 = new QLabel(gridLayoutWidget_2);
+        state_r_42->setObjectName(QString::fromUtf8("state_r_42"));
+
+        verticalLayout_12->addWidget(state_r_42);
+
+        state_r_43 = new QLabel(gridLayoutWidget_2);
+        state_r_43->setObjectName(QString::fromUtf8("state_r_43"));
+
+        verticalLayout_12->addWidget(state_r_43);
+
+
+        gridLayout_3->addLayout(verticalLayout_12, 3, 9, 1, 1);
+
         label_38 = new QLabel(gridLayoutWidget_2);
         label_38->setObjectName(QString::fromUtf8("label_38"));
 
-        gridLayout_3->addWidget(label_38, 1, 3, 1, 1);
+        gridLayout_3->addWidget(label_38, 1, 5, 1, 1);
 
-        verticalLayout_6 = new QVBoxLayout();
-        verticalLayout_6->setObjectName(QString::fromUtf8("verticalLayout_6"));
-        state_r_10 = new QLabel(gridLayoutWidget_2);
-        state_r_10->setObjectName(QString::fromUtf8("state_r_10"));
+        label_40 = new QLabel(gridLayoutWidget_2);
+        label_40->setObjectName(QString::fromUtf8("label_40"));
 
-        verticalLayout_6->addWidget(state_r_10);
+        gridLayout_3->addWidget(label_40, 1, 0, 1, 1);
 
-        state_r_11 = new QLabel(gridLayoutWidget_2);
-        state_r_11->setObjectName(QString::fromUtf8("state_r_11"));
+        verticalLayout_14 = new QVBoxLayout();
+        verticalLayout_14->setObjectName(QString::fromUtf8("verticalLayout_14"));
+        calib_l_10 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_10->setObjectName(QString::fromUtf8("calib_l_10"));
 
-        verticalLayout_6->addWidget(state_r_11);
+        verticalLayout_14->addWidget(calib_l_10);
 
-        state_r_12 = new QLabel(gridLayoutWidget_2);
-        state_r_12->setObjectName(QString::fromUtf8("state_r_12"));
+        calib_l_11 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_11->setObjectName(QString::fromUtf8("calib_l_11"));
+        calib_l_11->setChecked(false);
 
-        verticalLayout_6->addWidget(state_r_12);
+        verticalLayout_14->addWidget(calib_l_11);
 
-        state_r_13 = new QLabel(gridLayoutWidget_2);
-        state_r_13->setObjectName(QString::fromUtf8("state_r_13"));
+        calib_l_12 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_12->setObjectName(QString::fromUtf8("calib_l_12"));
 
-        verticalLayout_6->addWidget(state_r_13);
+        verticalLayout_14->addWidget(calib_l_12);
+
+        calib_l_13 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_13->setObjectName(QString::fromUtf8("calib_l_13"));
+
+        verticalLayout_14->addWidget(calib_l_13);
 
 
-        gridLayout_3->addLayout(verticalLayout_6, 3, 2, 1, 1);
+        gridLayout_3->addLayout(verticalLayout_14, 2, 4, 1, 1);
+
+        verticalLayout_23 = new QVBoxLayout();
+        verticalLayout_23->setObjectName(QString::fromUtf8("verticalLayout_23"));
+        calib_l_40 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_40->setObjectName(QString::fromUtf8("calib_l_40"));
+
+        verticalLayout_23->addWidget(calib_l_40);
+
+        calib_l_41 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_41->setObjectName(QString::fromUtf8("calib_l_41"));
+
+        verticalLayout_23->addWidget(calib_l_41);
+
+        calib_l_42 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_42->setObjectName(QString::fromUtf8("calib_l_42"));
+
+        verticalLayout_23->addWidget(calib_l_42);
+
+        calib_l_43 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_43->setObjectName(QString::fromUtf8("calib_l_43"));
+
+        verticalLayout_23->addWidget(calib_l_43);
+
+
+        gridLayout_3->addLayout(verticalLayout_23, 2, 10, 1, 1);
+
+        verticalLayout_22 = new QVBoxLayout();
+        verticalLayout_22->setObjectName(QString::fromUtf8("verticalLayout_22"));
+        calib_l_30 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_30->setObjectName(QString::fromUtf8("calib_l_30"));
+
+        verticalLayout_22->addWidget(calib_l_30);
+
+        calib_l_31 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_31->setObjectName(QString::fromUtf8("calib_l_31"));
+
+        verticalLayout_22->addWidget(calib_l_31);
+
+        calib_l_32 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_32->setObjectName(QString::fromUtf8("calib_l_32"));
+
+        verticalLayout_22->addWidget(calib_l_32);
+
+        calib_l_33 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_33->setObjectName(QString::fromUtf8("calib_l_33"));
+
+        verticalLayout_22->addWidget(calib_l_33);
+
+
+        gridLayout_3->addLayout(verticalLayout_22, 2, 8, 1, 1);
+
+        label_41 = new QLabel(gridLayoutWidget_2);
+        label_41->setObjectName(QString::fromUtf8("label_41"));
+
+        gridLayout_3->addWidget(label_41, 1, 7, 1, 1);
 
         verticalLayout_4 = new QVBoxLayout();
         verticalLayout_4->setObjectName(QString::fromUtf8("verticalLayout_4"));
@@ -487,71 +646,6 @@ public:
 
         gridLayout_3->addLayout(verticalLayout_4, 3, 1, 1, 1);
 
-        label_35 = new QLabel(gridLayoutWidget_2);
-        label_35->setObjectName(QString::fromUtf8("label_35"));
-
-        gridLayout_3->addWidget(label_35, 1, 2, 1, 1);
-
-        label_41 = new QLabel(gridLayoutWidget_2);
-        label_41->setObjectName(QString::fromUtf8("label_41"));
-
-        gridLayout_3->addWidget(label_41, 1, 4, 1, 1);
-
-        verticalLayout_2 = new QVBoxLayout();
-        verticalLayout_2->setObjectName(QString::fromUtf8("verticalLayout_2"));
-        state_l_10 = new QLabel(gridLayoutWidget_2);
-        state_l_10->setObjectName(QString::fromUtf8("state_l_10"));
-
-        verticalLayout_2->addWidget(state_l_10);
-
-        state_l_11 = new QLabel(gridLayoutWidget_2);
-        state_l_11->setObjectName(QString::fromUtf8("state_l_11"));
-
-        verticalLayout_2->addWidget(state_l_11);
-
-        state_l_12 = new QLabel(gridLayoutWidget_2);
-        state_l_12->setObjectName(QString::fromUtf8("state_l_12"));
-
-        verticalLayout_2->addWidget(state_l_12);
-
-        state_l_13 = new QLabel(gridLayoutWidget_2);
-        state_l_13->setObjectName(QString::fromUtf8("state_l_13"));
-
-        verticalLayout_2->addWidget(state_l_13);
-
-
-        gridLayout_3->addLayout(verticalLayout_2, 2, 2, 1, 1);
-
-        verticalLayout_7 = new QVBoxLayout();
-        verticalLayout_7->setObjectName(QString::fromUtf8("verticalLayout_7"));
-        state_r_20 = new QLabel(gridLayoutWidget_2);
-        state_r_20->setObjectName(QString::fromUtf8("state_r_20"));
-
-        verticalLayout_7->addWidget(state_r_20);
-
-        state_r_21 = new QLabel(gridLayoutWidget_2);
-        state_r_21->setObjectName(QString::fromUtf8("state_r_21"));
-
-        verticalLayout_7->addWidget(state_r_21);
-
-        state_r_22 = new QLabel(gridLayoutWidget_2);
-        state_r_22->setObjectName(QString::fromUtf8("state_r_22"));
-
-        verticalLayout_7->addWidget(state_r_22);
-
-        state_r_23 = new QLabel(gridLayoutWidget_2);
-        state_r_23->setObjectName(QString::fromUtf8("state_r_23"));
-
-        verticalLayout_7->addWidget(state_r_23);
-
-
-        gridLayout_3->addLayout(verticalLayout_7, 3, 3, 1, 1);
-
-        label_32 = new QLabel(gridLayoutWidget_2);
-        label_32->setObjectName(QString::fromUtf8("label_32"));
-
-        gridLayout_3->addWidget(label_32, 1, 1, 1, 1);
-
         verticalLayout = new QVBoxLayout();
         verticalLayout->setObjectName(QString::fromUtf8("verticalLayout"));
         state_l_00 = new QLabel(gridLayoutWidget_2);
@@ -577,35 +671,40 @@ public:
 
         gridLayout_3->addLayout(verticalLayout, 2, 1, 1, 1);
 
-        label_42 = new QLabel(gridLayoutWidget_2);
-        label_42->setObjectName(QString::fromUtf8("label_42"));
+        label_34 = new QLabel(gridLayoutWidget_2);
+        label_34->setObjectName(QString::fromUtf8("label_34"));
 
-        gridLayout_3->addWidget(label_42, 1, 5, 1, 1);
+        gridLayout_3->addWidget(label_34, 3, 0, 1, 1);
 
-        verticalLayout_9 = new QVBoxLayout();
-        verticalLayout_9->setObjectName(QString::fromUtf8("verticalLayout_9"));
-        state_l_30 = new QLabel(gridLayoutWidget_2);
-        state_l_30->setObjectName(QString::fromUtf8("state_l_30"));
+        verticalLayout_3 = new QVBoxLayout();
+        verticalLayout_3->setObjectName(QString::fromUtf8("verticalLayout_3"));
+        state_l_20 = new QLabel(gridLayoutWidget_2);
+        state_l_20->setObjectName(QString::fromUtf8("state_l_20"));
 
-        verticalLayout_9->addWidget(state_l_30);
+        verticalLayout_3->addWidget(state_l_20);
 
-        state_l_31 = new QLabel(gridLayoutWidget_2);
-        state_l_31->setObjectName(QString::fromUtf8("state_l_31"));
+        state_l_21 = new QLabel(gridLayoutWidget_2);
+        state_l_21->setObjectName(QString::fromUtf8("state_l_21"));
 
-        verticalLayout_9->addWidget(state_l_31);
+        verticalLayout_3->addWidget(state_l_21);
 
-        state_l_32 = new QLabel(gridLayoutWidget_2);
-        state_l_32->setObjectName(QString::fromUtf8("state_l_32"));
+        state_l_22 = new QLabel(gridLayoutWidget_2);
+        state_l_22->setObjectName(QString::fromUtf8("state_l_22"));
 
-        verticalLayout_9->addWidget(state_l_32);
+        verticalLayout_3->addWidget(state_l_22);
 
-        state_l_33 = new QLabel(gridLayoutWidget_2);
-        state_l_33->setObjectName(QString::fromUtf8("state_l_33"));
+        state_l_23 = new QLabel(gridLayoutWidget_2);
+        state_l_23->setObjectName(QString::fromUtf8("state_l_23"));
 
-        verticalLayout_9->addWidget(state_l_33);
+        verticalLayout_3->addWidget(state_l_23);
 
 
-        gridLayout_3->addLayout(verticalLayout_9, 2, 4, 1, 1);
+        gridLayout_3->addLayout(verticalLayout_3, 2, 5, 1, 1);
+
+        label_32 = new QLabel(gridLayoutWidget_2);
+        label_32->setObjectName(QString::fromUtf8("label_32"));
+
+        gridLayout_3->addWidget(label_32, 1, 1, 1, 1);
 
         verticalLayout_10 = new QVBoxLayout();
         verticalLayout_10->setObjectName(QString::fromUtf8("verticalLayout_10"));
@@ -630,7 +729,7 @@ public:
         verticalLayout_10->addWidget(state_l_43);
 
 
-        gridLayout_3->addLayout(verticalLayout_10, 2, 5, 1, 1);
+        gridLayout_3->addLayout(verticalLayout_10, 2, 9, 1, 1);
 
         verticalLayout_11 = new QVBoxLayout();
         verticalLayout_11->setObjectName(QString::fromUtf8("verticalLayout_11"));
@@ -655,38 +754,249 @@ public:
         verticalLayout_11->addWidget(state_r_33);
 
 
-        gridLayout_3->addLayout(verticalLayout_11, 3, 4, 1, 1);
+        gridLayout_3->addLayout(verticalLayout_11, 3, 7, 1, 1);
 
-        verticalLayout_12 = new QVBoxLayout();
-        verticalLayout_12->setObjectName(QString::fromUtf8("verticalLayout_12"));
-        state_r_40 = new QLabel(gridLayoutWidget_2);
-        state_r_40->setObjectName(QString::fromUtf8("state_r_40"));
+        verticalLayout_7 = new QVBoxLayout();
+        verticalLayout_7->setObjectName(QString::fromUtf8("verticalLayout_7"));
+        state_r_20 = new QLabel(gridLayoutWidget_2);
+        state_r_20->setObjectName(QString::fromUtf8("state_r_20"));
 
-        verticalLayout_12->addWidget(state_r_40);
+        verticalLayout_7->addWidget(state_r_20);
 
-        state_r_41 = new QLabel(gridLayoutWidget_2);
-        state_r_41->setObjectName(QString::fromUtf8("state_r_41"));
+        state_r_21 = new QLabel(gridLayoutWidget_2);
+        state_r_21->setObjectName(QString::fromUtf8("state_r_21"));
 
-        verticalLayout_12->addWidget(state_r_41);
+        verticalLayout_7->addWidget(state_r_21);
 
-        state_r_42 = new QLabel(gridLayoutWidget_2);
-        state_r_42->setObjectName(QString::fromUtf8("state_r_42"));
+        state_r_22 = new QLabel(gridLayoutWidget_2);
+        state_r_22->setObjectName(QString::fromUtf8("state_r_22"));
 
-        verticalLayout_12->addWidget(state_r_42);
+        verticalLayout_7->addWidget(state_r_22);
 
-        state_r_43 = new QLabel(gridLayoutWidget_2);
-        state_r_43->setObjectName(QString::fromUtf8("state_r_43"));
+        state_r_23 = new QLabel(gridLayoutWidget_2);
+        state_r_23->setObjectName(QString::fromUtf8("state_r_23"));
 
-        verticalLayout_12->addWidget(state_r_43);
+        verticalLayout_7->addWidget(state_r_23);
 
 
-        gridLayout_3->addLayout(verticalLayout_12, 3, 5, 1, 1);
+        gridLayout_3->addLayout(verticalLayout_7, 3, 5, 1, 1);
 
-        label_40 = new QLabel(gridLayoutWidget_2);
-        label_40->setObjectName(QString::fromUtf8("label_40"));
+        verticalLayout_9 = new QVBoxLayout();
+        verticalLayout_9->setObjectName(QString::fromUtf8("verticalLayout_9"));
+        state_l_30 = new QLabel(gridLayoutWidget_2);
+        state_l_30->setObjectName(QString::fromUtf8("state_l_30"));
 
-        gridLayout_3->addWidget(label_40, 1, 0, 1, 1);
+        verticalLayout_9->addWidget(state_l_30);
 
+        state_l_31 = new QLabel(gridLayoutWidget_2);
+        state_l_31->setObjectName(QString::fromUtf8("state_l_31"));
+
+        verticalLayout_9->addWidget(state_l_31);
+
+        state_l_32 = new QLabel(gridLayoutWidget_2);
+        state_l_32->setObjectName(QString::fromUtf8("state_l_32"));
+
+        verticalLayout_9->addWidget(state_l_32);
+
+        state_l_33 = new QLabel(gridLayoutWidget_2);
+        state_l_33->setObjectName(QString::fromUtf8("state_l_33"));
+
+        verticalLayout_9->addWidget(state_l_33);
+
+
+        gridLayout_3->addLayout(verticalLayout_9, 2, 7, 1, 1);
+
+        label_35 = new QLabel(gridLayoutWidget_2);
+        label_35->setObjectName(QString::fromUtf8("label_35"));
+
+        gridLayout_3->addWidget(label_35, 1, 3, 1, 1);
+
+        verticalLayout_13 = new QVBoxLayout();
+        verticalLayout_13->setObjectName(QString::fromUtf8("verticalLayout_13"));
+        calib_l_00 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_00->setObjectName(QString::fromUtf8("calib_l_00"));
+
+        verticalLayout_13->addWidget(calib_l_00);
+
+        calib_l_01 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_01->setObjectName(QString::fromUtf8("calib_l_01"));
+
+        verticalLayout_13->addWidget(calib_l_01);
+
+        calib_l_02 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_02->setObjectName(QString::fromUtf8("calib_l_02"));
+
+        verticalLayout_13->addWidget(calib_l_02);
+
+        calib_l_03 = new QCheckBox(gridLayoutWidget_2);
+        calib_l_03->setObjectName(QString::fromUtf8("calib_l_03"));
+
+        verticalLayout_13->addWidget(calib_l_03);
+
+
+        gridLayout_3->addLayout(verticalLayout_13, 2, 2, 1, 1);
+
+        verticalLayout_6 = new QVBoxLayout();
+        verticalLayout_6->setObjectName(QString::fromUtf8("verticalLayout_6"));
+        state_r_10 = new QLabel(gridLayoutWidget_2);
+        state_r_10->setObjectName(QString::fromUtf8("state_r_10"));
+
+        verticalLayout_6->addWidget(state_r_10);
+
+        state_r_11 = new QLabel(gridLayoutWidget_2);
+        state_r_11->setObjectName(QString::fromUtf8("state_r_11"));
+
+        verticalLayout_6->addWidget(state_r_11);
+
+        state_r_12 = new QLabel(gridLayoutWidget_2);
+        state_r_12->setObjectName(QString::fromUtf8("state_r_12"));
+
+        verticalLayout_6->addWidget(state_r_12);
+
+        state_r_13 = new QLabel(gridLayoutWidget_2);
+        state_r_13->setObjectName(QString::fromUtf8("state_r_13"));
+
+        verticalLayout_6->addWidget(state_r_13);
+
+
+        gridLayout_3->addLayout(verticalLayout_6, 3, 3, 1, 1);
+
+        label_42 = new QLabel(gridLayoutWidget_2);
+        label_42->setObjectName(QString::fromUtf8("label_42"));
+
+        gridLayout_3->addWidget(label_42, 1, 9, 1, 1);
+
+        verticalLayout_15 = new QVBoxLayout();
+        verticalLayout_15->setObjectName(QString::fromUtf8("verticalLayout_15"));
+        calib_r_00 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_00->setObjectName(QString::fromUtf8("calib_r_00"));
+
+        verticalLayout_15->addWidget(calib_r_00);
+
+        calib_r_01 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_01->setObjectName(QString::fromUtf8("calib_r_01"));
+
+        verticalLayout_15->addWidget(calib_r_01);
+
+        calib_r_02 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_02->setObjectName(QString::fromUtf8("calib_r_02"));
+
+        verticalLayout_15->addWidget(calib_r_02);
+
+        calib_r_03 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_03->setObjectName(QString::fromUtf8("calib_r_03"));
+
+        verticalLayout_15->addWidget(calib_r_03);
+
+
+        gridLayout_3->addLayout(verticalLayout_15, 3, 2, 1, 1);
+
+        verticalLayout_16 = new QVBoxLayout();
+        verticalLayout_16->setObjectName(QString::fromUtf8("verticalLayout_16"));
+        calib_r_10 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_10->setObjectName(QString::fromUtf8("calib_r_10"));
+
+        verticalLayout_16->addWidget(calib_r_10);
+
+        calib_r_11 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_11->setObjectName(QString::fromUtf8("calib_r_11"));
+
+        verticalLayout_16->addWidget(calib_r_11);
+
+        calib_r_12 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_12->setObjectName(QString::fromUtf8("calib_r_12"));
+
+        verticalLayout_16->addWidget(calib_r_12);
+
+        calib_r_13 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_13->setObjectName(QString::fromUtf8("calib_r_13"));
+
+        verticalLayout_16->addWidget(calib_r_13);
+
+
+        gridLayout_3->addLayout(verticalLayout_16, 3, 4, 1, 1);
+
+        verticalLayout_17 = new QVBoxLayout();
+        verticalLayout_17->setObjectName(QString::fromUtf8("verticalLayout_17"));
+        calib_r_20 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_20->setObjectName(QString::fromUtf8("calib_r_20"));
+
+        verticalLayout_17->addWidget(calib_r_20);
+
+        calib_r_21 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_21->setObjectName(QString::fromUtf8("calib_r_21"));
+
+        verticalLayout_17->addWidget(calib_r_21);
+
+        calib_r_22 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_22->setObjectName(QString::fromUtf8("calib_r_22"));
+
+        verticalLayout_17->addWidget(calib_r_22);
+
+        calib_r_23 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_23->setObjectName(QString::fromUtf8("calib_r_23"));
+
+        verticalLayout_17->addWidget(calib_r_23);
+
+
+        gridLayout_3->addLayout(verticalLayout_17, 3, 6, 1, 1);
+
+        verticalLayout_18 = new QVBoxLayout();
+        verticalLayout_18->setObjectName(QString::fromUtf8("verticalLayout_18"));
+        calib_r_30 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_30->setObjectName(QString::fromUtf8("calib_r_30"));
+
+        verticalLayout_18->addWidget(calib_r_30);
+
+        calib_r_31 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_31->setObjectName(QString::fromUtf8("calib_r_31"));
+
+        verticalLayout_18->addWidget(calib_r_31);
+
+        calib_r_32 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_32->setObjectName(QString::fromUtf8("calib_r_32"));
+
+        verticalLayout_18->addWidget(calib_r_32);
+
+        calib_r_33 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_33->setObjectName(QString::fromUtf8("calib_r_33"));
+
+        verticalLayout_18->addWidget(calib_r_33);
+
+
+        gridLayout_3->addLayout(verticalLayout_18, 3, 8, 1, 1);
+
+        verticalLayout_19 = new QVBoxLayout();
+        verticalLayout_19->setObjectName(QString::fromUtf8("verticalLayout_19"));
+        calib_r_40 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_40->setObjectName(QString::fromUtf8("calib_r_40"));
+
+        verticalLayout_19->addWidget(calib_r_40);
+
+        calib_r_41 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_41->setObjectName(QString::fromUtf8("calib_r_41"));
+
+        verticalLayout_19->addWidget(calib_r_41);
+
+        calib_r_42 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_42->setObjectName(QString::fromUtf8("calib_r_42"));
+
+        verticalLayout_19->addWidget(calib_r_42);
+
+        calib_r_43 = new QCheckBox(gridLayoutWidget_2);
+        calib_r_43->setObjectName(QString::fromUtf8("calib_r_43"));
+
+        verticalLayout_19->addWidget(calib_r_43);
+
+
+        gridLayout_3->addLayout(verticalLayout_19, 3, 10, 1, 1);
+
+        label_43 = new QLabel(tab);
+        label_43->setObjectName(QString::fromUtf8("label_43"));
+        label_43->setGeometry(QRect(20, 260, 81, 21));
+        calib_refresh = new QPushButton(tab);
+        calib_refresh->setObjectName(QString::fromUtf8("calib_refresh"));
+        calib_refresh->setGeometry(QRect(20, 280, 111, 27));
         tabWidget->addTab(tab, QString());
         tab_3 = new QWidget();
         tab_3->setObjectName(QString::fromUtf8("tab_3"));
@@ -1484,41 +1794,48 @@ public:
         result_com->setText(QString());
         result_ctrl->setText(QString());
         label_28->setText(QCoreApplication::translate("MainWindow", "\344\270\212\347\224\265\345\220\216\345\274\200\345\220\257\350\277\207\347\250\213", nullptr));
-        state_l_20->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
-        state_l_21->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
-        state_l_22->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
-        state_l_23->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
-        label_34->setText(QCoreApplication::translate("MainWindow", "right", nullptr));
-        label_39->setText(QCoreApplication::translate("MainWindow", "left", nullptr));
-        label_38->setText(QCoreApplication::translate("MainWindow", "finger2", nullptr));
-        state_r_10->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
-        state_r_11->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
-        state_r_12->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
-        state_r_13->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
-        state_r_00->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
-        state_r_01->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
-        state_r_02->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
-        state_r_03->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
-        label_35->setText(QCoreApplication::translate("MainWindow", "finger1", nullptr));
-        label_41->setText(QCoreApplication::translate("MainWindow", "finger3", nullptr));
+        calib_l_20->setText(QString());
+        calib_l_21->setText(QString());
+        calib_l_22->setText(QString());
+        calib_l_23->setText(QString());
         state_l_10->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
         state_l_11->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
         state_l_12->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
         state_l_13->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
-        state_r_20->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
-        state_r_21->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
-        state_r_22->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
-        state_r_23->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
-        label_32->setText(QCoreApplication::translate("MainWindow", "finger0", nullptr));
+        label_39->setText(QCoreApplication::translate("MainWindow", "left", nullptr));
+        state_r_40->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
+        state_r_41->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
+        state_r_42->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
+        state_r_43->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
+        label_38->setText(QCoreApplication::translate("MainWindow", "finger2", nullptr));
+        label_40->setText(QCoreApplication::translate("MainWindow", "mc_state", nullptr));
+        calib_l_10->setText(QString());
+        calib_l_11->setText(QString());
+        calib_l_12->setText(QString());
+        calib_l_13->setText(QString());
+        calib_l_40->setText(QString());
+        calib_l_41->setText(QString());
+        calib_l_42->setText(QString());
+        calib_l_43->setText(QString());
+        calib_l_30->setText(QString());
+        calib_l_31->setText(QString());
+        calib_l_32->setText(QString());
+        calib_l_33->setText(QString());
+        label_41->setText(QCoreApplication::translate("MainWindow", "finger3", nullptr));
+        state_r_00->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
+        state_r_01->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
+        state_r_02->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
+        state_r_03->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
         state_l_00->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
         state_l_01->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
         state_l_02->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
         state_l_03->setText(QCoreApplication::translate("MainWindow", "3:", nullptr));
-        label_42->setText(QCoreApplication::translate("MainWindow", "finger4", nullptr));
-        state_l_30->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
-        state_l_31->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
-        state_l_32->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
-        state_l_33->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
+        label_34->setText(QCoreApplication::translate("MainWindow", "right", nullptr));
+        state_l_20->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
+        state_l_21->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
+        state_l_22->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
+        state_l_23->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
+        label_32->setText(QCoreApplication::translate("MainWindow", "finger0", nullptr));
         state_l_40->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
         state_l_41->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
         state_l_42->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
@@ -1527,11 +1844,46 @@ public:
         state_r_31->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
         state_r_32->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
         state_r_33->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
-        state_r_40->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
-        state_r_41->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
-        state_r_42->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
-        state_r_43->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
-        label_40->setText(QCoreApplication::translate("MainWindow", "mc_state", nullptr));
+        state_r_20->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
+        state_r_21->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
+        state_r_22->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
+        state_r_23->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
+        state_l_30->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
+        state_l_31->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
+        state_l_32->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
+        state_l_33->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
+        label_35->setText(QCoreApplication::translate("MainWindow", "finger1", nullptr));
+        calib_l_00->setText(QString());
+        calib_l_01->setText(QString());
+        calib_l_02->setText(QString());
+        calib_l_03->setText(QString());
+        state_r_10->setText(QCoreApplication::translate("MainWindow", "0: ", nullptr));
+        state_r_11->setText(QCoreApplication::translate("MainWindow", "1: ", nullptr));
+        state_r_12->setText(QCoreApplication::translate("MainWindow", "2: ", nullptr));
+        state_r_13->setText(QCoreApplication::translate("MainWindow", "3: ", nullptr));
+        label_42->setText(QCoreApplication::translate("MainWindow", "finger4", nullptr));
+        calib_r_00->setText(QString());
+        calib_r_01->setText(QString());
+        calib_r_02->setText(QString());
+        calib_r_03->setText(QString());
+        calib_r_10->setText(QString());
+        calib_r_11->setText(QString());
+        calib_r_12->setText(QString());
+        calib_r_13->setText(QString());
+        calib_r_20->setText(QString());
+        calib_r_21->setText(QString());
+        calib_r_22->setText(QString());
+        calib_r_23->setText(QString());
+        calib_r_30->setText(QString());
+        calib_r_31->setText(QString());
+        calib_r_32->setText(QString());
+        calib_r_33->setText(QString());
+        calib_r_40->setText(QString());
+        calib_r_41->setText(QString());
+        calib_r_42->setText(QString());
+        calib_r_43->setText(QString());
+        label_43->setText(QCoreApplication::translate("MainWindow", "zero calib", nullptr));
+        calib_refresh->setText(QCoreApplication::translate("MainWindow", "calib_refresh", nullptr));
         tabWidget->setTabText(tabWidget->indexOf(tab), QCoreApplication::translate("MainWindow", "\350\277\236\346\216\245", nullptr));
         selectFile->setText(QCoreApplication::translate("MainWindow", "\351\200\211\346\213\251\346\226\207\344\273\266", nullptr));
         label_30->setText(QCoreApplication::translate("MainWindow", "\346\222\255\346\224\276\346\211\223\347\202\271\347\232\204\345\212\250\344\275\234\357\274\214\346\226\207\344\273\266\346\240\274\345\274\217.json", nullptr));
@@ -1670,4 +2022,4 @@ namespace Ui {
 
 QT_END_NAMESPACE
 
-#endif // ETHERCAT_SDKAKBKFF_H
+#endif // ETHERCAT_SDKWPEGJT_H

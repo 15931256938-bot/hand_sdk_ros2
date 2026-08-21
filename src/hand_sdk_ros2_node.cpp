@@ -97,6 +97,9 @@ public:
         declare_parameter<std::string>("left_hand_name", "hand_200_L");
         declare_parameter<std::string>("right_hand_name", "hand_200_R");
         declare_parameter<double>("publish_rate_hz", 100.0);
+        // Not applied at bring-up any more -- nothing is enabled unattended, so
+        // there are no gains to set yet. Kept as the default the board's gains
+        // control starts from.
         declare_parameter<double>("initial_kp", 3.0);
         declare_parameter<double>("initial_kd", 3.0);
         declare_parameter<double>("bringup_timeout_sec", 5.0);
@@ -204,6 +207,19 @@ public:
     {
         std::lock_guard<std::mutex> lock(snapshot_mutex_);
         return hand == hand_sdk::service::Hand::kLeft ? left_snapshot_ : right_snapshot_;
+    }
+
+    // The board's seed_pos button. Runs the same step bring-up does, on the Qt
+    // thread: readState() is safe from anywhere, and the command itself is
+    // written under command_mutex_ like every other writer of it.
+    bool seedFromState(hand_sdk::service::Hand hand) override
+    {
+        auto& side = sideFor(hand);
+        if (!side.present) {
+            return false;
+        }
+        const char* label = hand == hand_sdk::service::Hand::kLeft ? "left" : "right";
+        return seedCommandFromState(side, label);
     }
 
 private:
@@ -455,10 +471,25 @@ private:
         return false;
     }
 
+    // Bring-up stops short of enabling anything.
+    //
+    // The device zeroes itself wherever it happens to be at power-up, so until
+    // a joint has been zero-calibrated its q is measured from an arbitrary boot
+    // pose. Enabling force control before that would hold the joint against a
+    // pose in a frame the calibration is about to replace. Zero calibration is
+    // a deliberate, per-joint operation -- it drives the motor looking for its
+    // stop -- so it is not something a node constructor should be starting on
+    // its own either.
+    //
+    // What is left is everything that is safe unattended: get the motors
+    // talking, and latch the pose they are already in so that whoever enables
+    // control has something sane standing. Force control and gains are pressed
+    // from the board once the joints are calibrated (`zero_calibrate` ->
+    // `seed current pos` -> enable), which is also why `set com all` is still
+    // there: if this fails, that is the retry.
     bool bringUpSide(SideState& side, const char* label)
     {
         using hand_sdk::service::ComCmd;
-        using hand_sdk::service::LoopMode;
 
         waitForMcReady(side.hand, label);
 
@@ -468,27 +499,13 @@ private:
             return false;
         }
 
-        // Stay at current after enabling
         if (!seedCommandFromState(side, label)) {
             return false;
         }
 
-        const auto mode = api_->serviceMode(side.hand, LoopMode::kForceControl, true);
-        if (!mode.success) {
-            RCLCPP_WARN(get_logger(), "%s force-control enable failed: %s", label, mode.msg.c_str());
-            return false;
-        }
-
-        const double kp = get_parameter("initial_kp").as_double();
-        const double kd = get_parameter("initial_kd").as_double();
-        const auto gains = api_->serviceGains(side.hand, static_cast<float>(kp), static_cast<float>(kd));
-        if (!gains.success) {
-            RCLCPP_WARN(get_logger(), "%s initial gains failed: %s", label, gains.msg.c_str());
-            return false;
-        }
-
-        RCLCPP_INFO(get_logger(), "%s initial gains set: kp=%.3f kd=%.3f",
-                    label, gains.value[0].kp, gains.value[0].kd);
+        RCLCPP_INFO(get_logger(),
+                    "%s ready: broadcasting and holding its measured pose. Not enabled -- "
+                    "zero-calibrate, re-seed, then enable control from the board.", label);
         return true;
     }
 

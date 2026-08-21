@@ -1,6 +1,7 @@
 #include "hand_sdk_app.hpp"
 
 #include <QApplication>
+#include <QCheckBox>
 #include <QCloseEvent>
 #include <QDateTime>
 #include <QJsonArray>
@@ -27,7 +28,7 @@ constexpr double kDegToRad = M_PI / 180.0;
 // so a dq_d of zero asks the motor to brake against its own motion for the
 // whole move. Same number, and the same reasoning, as hand_control_lib's
 // motion.default_speed. One knob: change it here.
-constexpr float kCommandVelocity = 0.1f;   // rad/s
+constexpr float kCommandVelocity = 0.0f;   // rad/s
 constexpr float kCommandTorqueFf = 0.0f;   // N*m
 
 // How close a gain readback has to be to count as set lives in
@@ -177,6 +178,23 @@ void renderMcLabels(const std::array<QLabel*, kNumUiJoints>& labels,
     }
 }
 
+// The zero-calibration state as it fits in a checkbox caption: the raw code
+// the device reported, then a word for it. Ten columns of these sit side by
+// side, so the caption is kept short and the spelled-out name goes in the
+// tooltip.
+QString zeroCalTag(hand_sdk::service::ZeroCalState state)
+{
+    switch (state) {
+    case hand_sdk::service::ZeroCalState::kFailed:        return QStringLiteral("-1 FAIL");
+    case hand_sdk::service::ZeroCalState::kNotCalibrated: return QStringLiteral("0 none");
+    case hand_sdk::service::ZeroCalState::kInProgress:    return QStringLiteral("1 busy");
+    case hand_sdk::service::ZeroCalState::kSucceeded:     return QStringLiteral("2 ok");
+    }
+    // A code outside the vendor table: shown raw rather than rounded to the
+    // nearest known one.
+    return QStringLiteral("%1 ?").arg(static_cast<int>(state));
+}
+
 } // namespace
 
 HandAppWindow::HandAppWindow()
@@ -224,6 +242,10 @@ void HandAppWindow::cacheJointWidgets()
         mc_right_labels_[i] =
             findChild<QLabel*>(QStringLiteral("state_r_%1%2").arg(finger).arg(joint));
         cmd_fields_[i] = findChild<QLineEdit*>(QStringLiteral("command_pos%1").arg(index));
+        calib_left_boxes_[i] =
+            findChild<QCheckBox*>(QStringLiteral("calib_l_%1%2").arg(finger).arg(joint));
+        calib_right_boxes_[i] =
+            findChild<QCheckBox*>(QStringLiteral("calib_r_%1%2").arg(finger).arg(joint));
         if (cmd_fields_[i] != nullptr) {
             cmd_fields_[i]->setText(QStringLiteral("0.0"));
         }
@@ -231,6 +253,7 @@ void HandAppWindow::cacheJointWidgets()
 
     resetMcLabels(mc_left_labels_);
     resetMcLabels(mc_right_labels_);
+    resetCalibBoxes();
 }
 
 void HandAppWindow::wireButtons()
@@ -247,6 +270,29 @@ void HandAppWindow::wireButtons()
     connect(ui_.button_readjson, &QPushButton::clicked, this, [this]() { onDumpJson(); });
 
     connect(ui_.quit, &QPushButton::clicked, this, [this]() { close(); });
+
+    wireCalibBoxes();
+}
+
+void HandAppWindow::wireCalibBoxes()
+{
+    using hand_sdk::service::Hand;
+
+    for (std::size_t i = 0; i < kNumUiJoints; ++i) {
+        for (const auto hand : {Hand::kLeft, Hand::kRight}) {
+            auto* box = calibBoxes(hand)[i];
+            if (box == nullptr) {
+                continue;
+            }
+            // clicked(), deliberately, rather than toggled() or stateChanged():
+            // only a press starts a calibration, so reverting a failed write
+            // and repainting from a refresh cannot loop back in here.
+            connect(box, &QCheckBox::clicked, this,
+                    [this, hand, i](bool checked) { onCalibClicked(hand, i, checked); });
+        }
+    }
+
+    connect(ui_.calib_refresh, &QPushButton::clicked, this, [this]() { onCalibRefresh(); });
 }
 
 void HandAppWindow::appendLog(const QString& text)
@@ -290,7 +336,9 @@ bool HandAppWindow::requireConnected(QLabel* result)
     if (api_ && (hands_.has_left || hands_.has_right)) {
         return true;
     }
-    setResult(result, Verdict::kFail, QStringLiteral("connect first"));
+    if (result != nullptr) {
+        setResult(result, Verdict::kFail, QStringLiteral("connect first"));
+    }
     appendLog(QStringLiteral("rejected: not connected"));
     return false;
 }
@@ -346,9 +394,16 @@ void HandAppWindow::onComm()
         notes[i] = QString::fromStdString(result.msg);
     }
 
-    // Seeding runs on every present hand, whatever the broadcast step did: a
-    // hand that is already listening from an earlier run still needs a pose
-    // latched, and getting one costs nothing if it is not.
+    // Seeding runs on every present hand, whatever the broadcast step did, and
+    // whatever any joint's calibration state is: seeding latches the pose the
+    // device is reporting *now*, in whatever frame it is currently using, so it
+    // is always correct at the moment it is taken.
+    //
+    // What it cannot survive is the frame moving afterwards. Zero-calibrating a
+    // joint redefines its origin, so a pose latched before that calibration
+    // refers to an origin the device has since dropped. The rule is therefore
+    // "seed last", not "seed only calibrated joints" -- press this again after
+    // any calibration and before `set ctrl`.
     QString seed_detail;
     const auto seeded = seedCommandFromState(hands, seed_detail);
 
@@ -545,6 +600,166 @@ void HandAppWindow::onMcState()
     appendLog(QStringLiteral("mc-state: %1").arg(text));
 }
 
+std::array<QCheckBox*, kNumUiJoints>& HandAppWindow::calibBoxes(hand_sdk::service::Hand hand)
+{
+    return hand == hand_sdk::service::Hand::kLeft ? calib_left_boxes_ : calib_right_boxes_;
+}
+
+std::array<bool, kNumUiJoints>& HandAppWindow::calibTicks(hand_sdk::service::Hand hand)
+{
+    return hand == hand_sdk::service::Hand::kLeft ? calib_left_ticks_ : calib_right_ticks_;
+}
+
+void HandAppWindow::paintCalibBox(hand_sdk::service::Hand hand, std::size_t joint,
+                                  hand_sdk::service::ZeroCalState state, bool ticked)
+{
+    calibTicks(hand)[joint] = ticked;
+
+    auto* box = calibBoxes(hand)[joint];
+    if (box == nullptr) {
+        return;
+    }
+    // setChecked() emits toggled(), not clicked() -- the boxes are wired on
+    // clicked(), so painting them here cannot fire a calibration back.
+    box->setChecked(ticked);
+    box->setText(zeroCalTag(state));
+    box->setToolTip(QString::fromUtf8(hand_sdk::service::stateName(state)));
+}
+
+void HandAppWindow::blankCalibBoxes(hand_sdk::service::Hand hand,
+                                    const QString& text, const QString& tip)
+{
+    auto& boxes = calibBoxes(hand);
+    auto& ticks = calibTicks(hand);
+    for (std::size_t i = 0; i < kNumUiJoints; ++i) {
+        ticks[i] = false;
+        if (boxes[i] == nullptr) {
+            continue;
+        }
+        boxes[i]->setChecked(false);
+        boxes[i]->setText(text);
+        boxes[i]->setToolTip(tip);
+    }
+}
+
+bool HandAppWindow::handPresent(hand_sdk::service::Hand hand) const
+{
+    return hand == hand_sdk::service::Hand::kLeft ? hands_.has_left : hands_.has_right;
+}
+
+void HandAppWindow::resetCalibBoxes()
+{
+    using hand_sdk::service::Hand;
+    for (const auto hand : {Hand::kLeft, Hand::kRight}) {
+        blankCalibBoxes(hand, QStringLiteral("-"), QStringLiteral("not read yet"));
+    }
+}
+
+void HandAppWindow::onCalibClicked(hand_sdk::service::Hand hand, std::size_t joint, bool checked)
+{
+    auto* box = calibBoxes(hand)[joint];
+    const auto what = QStringLiteral("zero-cal %1 j%2").arg(handName(hand)).arg(static_cast<int>(joint));
+
+    // Unticking sends nothing -- the device has no way to undo a calibration --
+    // and the box is simply left empty. Only ticking ever puts anything on the
+    // wire, so an empty box means "not selected", never "the device said so";
+    // the caption keeps whatever state was last read, and calib_refresh is what
+    // repaints ticks from the device.
+    if (!checked) {
+        calibTicks(hand)[joint] = false;
+        appendLog(QStringLiteral("%1: unticked, nothing sent (only ticking starts a "
+                                 "calibration)")
+                      .arg(what));
+        return;
+    }
+
+    const auto revert = [&](const QString& why) {
+        calibTicks(hand)[joint] = false;
+        if (box != nullptr) {
+            box->setChecked(false);
+            box->setText(QStringLiteral("ERR"));
+            box->setToolTip(why);
+        }
+        appendLog(QStringLiteral("%1: FAILED -- %2").arg(what, why));
+    };
+
+    if (!requireConnected(nullptr)) {
+        revert(QStringLiteral("not connected"));
+        return;
+    }
+    if (!handPresent(hand)) {
+        revert(QStringLiteral("%1 hand not present").arg(handName(hand)));
+        return;
+    }
+
+    // No interlock against force control being enabled on this joint. This is a
+    // bench tool for bringing joints up one at a time, so each button does its
+    // own service call and nothing else -- connect is the only prerequisite any
+    // of them has. Calibrating a joint that is currently being held will have
+    // the loop and the routine fighting over the motor; that is the operator's
+    // call to make, not this window's.
+    //
+    // Only this joint is addressed; the other nineteen get the device's "no
+    // action" word and are not touched. ~10 ms on the GUI thread, one window.
+    const auto result = api_->serviceZeroCalibrate(
+        hand,
+        hand_sdk::service::ZeroCalDir::kSameAsEncoder,
+        hand_sdk::service::JointMask::single(joint));
+
+    if (!result.success) {
+        revert(QString::fromStdString(result.msg));
+        return;
+    }
+
+    // The tick stands for "the device took the request", not "the joint is
+    // calibrated" -- the routine runs for seconds past this window. What the
+    // reply already says about the joint goes in the caption, and calib_refresh
+    // is what turns it into the finished state.
+    paintCalibBox(hand, joint, result.value[joint], true);
+    appendLog(QStringLiteral("%1: ok, calibration started (%2)")
+                  .arg(what, QString::fromStdString(result.msg)));
+}
+
+void HandAppWindow::onCalibRefresh()
+{
+    if (!requireConnected(nullptr)) {
+        return;
+    }
+
+    // Cleared first, so a hand that is not there -- or one whose read fails
+    // below -- cannot leave a stale tick standing.
+    resetCalibBoxes();
+
+    QStringList parts;
+    for (const auto hand : presentHands()) {
+        const auto result = api_->serviceZeroCalibrateState(hand);
+        if (!result.success) {
+            const auto why = QString::fromStdString(result.msg);
+            blankCalibBoxes(hand, QStringLiteral("ERR"), why);
+            parts << QStringLiteral("%1: FAILED %2").arg(handName(hand), why);
+            continue;
+        }
+
+        // The one rule, applied here and nowhere else: ticked if and only if
+        // the joint reported succeeded. 0, 1 and -1 all come back unticked,
+        // including a joint that was ticked by hand a moment ago and has not
+        // finished -- or has failed.
+        for (std::size_t i = 0; i < kNumUiJoints; ++i) {
+            const auto state = result.value[i];
+            paintCalibBox(hand, i, state,
+                          state == hand_sdk::service::ZeroCalState::kSucceeded);
+        }
+        parts << QStringLiteral("%1: %2").arg(handName(hand),
+                                              QString::fromStdString(result.msg));
+    }
+
+    if (parts.isEmpty()) {
+        appendLog(QStringLiteral("calib refresh: no hands present"));
+        return;
+    }
+    appendLog(QStringLiteral("calib refresh: %1").arg(parts.join(QStringLiteral(" | "))));
+}
+
 void HandAppWindow::onGains()
 {
     if (!requireConnected(ui_.result_kpkd)) {
@@ -727,10 +942,42 @@ void HandAppWindow::shutdownSdk()
         poll_timer_->stop();
     }
     if (api_) {
+        const auto stats = api_->cycleStats();
         api_->disconnect();
+
+        // disconnect() re-reads the AL status, so this is the one place the
+        // window can say what state the slaves ended in. A run whose exchanges
+        // were failing ends somewhere other than OP, and the status code names
+        // the reason -- worth having in the log rather than only in a debugger.
+        const auto describe = [](const hand_sdk::SlaveStatus& st) {
+            if (!st.present) {
+                return QStringLiteral("absent");
+            }
+            auto text = QStringLiteral("%1 (AL 0x%2, code 0x%3)")
+                            .arg(QString::fromStdString(st.state_text))
+                            .arg(st.al_state, 0, 16)
+                            .arg(st.al_status_code, 0, 16);
+            if (!st.error_text.empty()) {
+                text += QStringLiteral(" -- %1").arg(QString::fromStdString(st.error_text));
+            }
+            return text;
+        };
+        appendLog(QStringLiteral("bus at disconnect: left %1 | right %2")
+                      .arg(describe(api_->leftStatus()), describe(api_->rightStatus())));
+        appendLog(QStringLiteral("cycles %1 | exchange failures %2 | phase %3 us")
+                      .arg(stats.cycles)
+                      .arg(stats.exchange_failures)
+                      .arg(stats.phase_error_ns / 1000));
+
         api_.reset();
     }
     hands_ = hand_sdk::HandsStatus{};
+
+    // The device zeroes itself on power-up and pos_zero_calibration_state goes
+    // back to 0 with it, so a tick cannot outlive the connection that earned
+    // it. Left standing, it would claim a machine frame that the next power
+    // cycle has already thrown away.
+    resetCalibBoxes();
 }
 
 int main(int argc, char** argv)

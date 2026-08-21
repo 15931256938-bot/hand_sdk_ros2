@@ -2,7 +2,9 @@
 
 #include <hand_sdk.hpp>
 
+#include <QCheckBox>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMainWindow>
 #include <QString>
 #include <QTimer>
@@ -39,6 +41,14 @@ public:
     virtual hand_sdk::Api* api() = 0;
     virtual bool present(hand_sdk::service::Hand hand) const = 0;
     virtual BoardSnapshot snapshot(hand_sdk::service::Hand hand) const = 0;
+
+    // Re-latch the standing command from the measured pose. This has to go
+    // through the node rather than being a sendCommand() from the board: the
+    // node re-sends its own command holder on every joint_command it receives,
+    // so anything the board wrote straight to the bus would be overwritten by
+    // the next message. Returns false if the hand is absent or no state came
+    // back to seed from.
+    virtual bool seedFromState(hand_sdk::service::Hand hand) = 0;
 };
 
 // Diagnostic front end for hand_sdk_ros2_node: watch what is being published,
@@ -62,20 +72,37 @@ private:
     void onMcState();     // button_mc_state:   cmd 12, per-joint mc state + fault
     void onCtrlState();   // button_ctrl_state: cmd 11 all-ignore, reports mode/enable
     void onSetEnable(bool enable);  // ctrl_cmd_enable / ctrl_cmd_disable
+    void onSetComAll();      // set_com_all_button: cmd 4, start broadcast
+    void onZeroCalibrate();  // zero_calibrate:  cmd 10 write, ticked joints only
+    void onCalibrateState(); // calibrate_state: cmd 10 read, every joint
+    void onSeedPos();        // seed_pos: re-latch the hold pose from measured
+    void onReadGains();      // pushButton "read_gains": cmd 14 read, every joint
+    void onSetGains();       // set_gains: cmd 14 write, ticked joints only
+
+    // --- the tick table ----------------------------------------------------
+    //
+    // The ticks are a selection and nothing else: which motors the next write
+    // is aimed at. Nothing the device says ever moves one -- only a click, or
+    // select_all / clear_all. That is what makes them safe to press a write
+    // against, since what is ticked is exactly what somebody chose.
+    //
+    // The captions are the other half and move independently: `calibrate state`
+    // fills all forty from cmd 10, and select_all / clear_all leave them alone.
+    void setAllChecks(bool on);   // select_all / clear_all
+    hand_sdk::service::JointMask checkedMask(hand_sdk::service::Hand hand) const;
+    void setCheckCaptions(hand_sdk::service::Hand hand, const QString& text, const QString& tip);
 
     // One-line verdict for the enable/disable buttons. They do not touch the
     // state grid: that shows the last state you asked for, and a write silently
     // repainting it would blur "what I read" with "what I just did".
     void setCtrlResult(bool ok, const QString& text);
-    static QString jointName(std::size_t joint);
-
-    // Which motor the finger/joint combos are pointing at.
-    std::size_t selectedJoint() const;
 
     void renderMcState(hand_sdk::service::Hand hand,
                        const hand_sdk::service::McStatusArray& status);
     void renderCtrlState(hand_sdk::service::Hand hand,
                          const hand_sdk::service::ModeStatusArray& status);
+    void renderGains(hand_sdk::service::Hand hand,
+                     const hand_sdk::service::JointGainsArray& gains);
     void clearStateColumn(hand_sdk::service::Hand hand, const QString& text);
 
     // --- readings tab ------------------------------------------------------
@@ -84,6 +111,8 @@ private:
     // --- helpers -----------------------------------------------------------
     void appendLog(const QString& text);
     std::array<QLabel*, kNumBoardJoints>& stateLabels(hand_sdk::service::Hand hand);
+    std::array<QCheckBox*, kNumBoardJoints>& checkBoxes(hand_sdk::service::Hand hand);
+    const std::array<QCheckBox*, kNumBoardJoints>& checkBoxes(hand_sdk::service::Hand hand) const;
 
     // Runs a service call on every hand the bus reported, logging each result.
     template <typename Call>
@@ -100,4 +129,6 @@ private:
     std::array<QLabel*, kNumBoardJoints> err_labels_{};
     std::array<QLabel*, kNumBoardJoints> state_left_{};
     std::array<QLabel*, kNumBoardJoints> state_right_{};
+    std::array<QCheckBox*, kNumBoardJoints> check_left_{};
+    std::array<QCheckBox*, kNumBoardJoints> check_right_{};
 };

@@ -2,6 +2,7 @@
 
 #include <hand_sdk.hpp>
 
+#include <QCheckBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMainWindow>
@@ -47,6 +48,7 @@ private:
 
     void cacheJointWidgets();
     void wireButtons();
+    void wireCalibBoxes();
 
     // --- Shared helpers ------------------------------------------------------
 
@@ -55,6 +57,8 @@ private:
 
     // The hands the bus actually reported; every service call targets these.
     std::vector<hand_sdk::service::Hand> presentHands() const;
+    // `result` may be null for the controls that have no result label of their
+    // own; the log line is written either way.
     bool requireConnected(QLabel* result);
 
     // --- Tab 1: bring-up, one step per button --------------------------------
@@ -77,6 +81,37 @@ private:
     void onCtrl();      // button_ctrl     -> result_ctrl
     void onMcState();   // button_mc_state -> result_mc_state
     void onGains();     // button_kpkd     -> result_kpkd
+
+    // --- Tab 1: zero-point calibration (cmd 10) ------------------------------
+
+    // One checkbox per joint per hand. calib_refresh paints the grid from the
+    // device: ticked == the joint last reported pos_zero_calibration_state 2,
+    // with 0, 1 and -1 all unticked, so a freshly refreshed grid can be scanned
+    // for what is actually zeroed.
+    //
+    // Ticking one box starts that joint's calibration and nothing else's.
+    // Unticking sends nothing -- there is no "un-calibrate" on the device --
+    // and leaves the box empty; between refreshes a tick is therefore only ever
+    // something the operator put there, never something the device claimed.
+    //
+    // The device zeroes itself at power-up and this state resets to 0 with it,
+    // so every session needs its own calibration and no tick may outlive the
+    // connection that earned it (see shutdownSdk()).
+    void onCalibClicked(hand_sdk::service::Hand hand, std::size_t joint, bool checked);
+    void onCalibRefresh();   // calib_refresh: re-read every joint's state
+    void resetCalibBoxes();
+
+    // Paint one box and remember the tick, so a later untick has something
+    // truthful to spring back to.
+    void paintCalibBox(hand_sdk::service::Hand hand, std::size_t joint,
+                       hand_sdk::service::ZeroCalState state, bool ticked);
+    // Clear a hand's whole column: no tick, `text` as the caption, `tip` as the
+    // reason. Used when there is nothing to show or the read failed.
+    void blankCalibBoxes(hand_sdk::service::Hand hand, const QString& text, const QString& tip);
+
+    std::array<QCheckBox*, kNumUiJoints>& calibBoxes(hand_sdk::service::Hand hand);
+    std::array<bool, kNumUiJoints>& calibTicks(hand_sdk::service::Hand hand);
+    bool handPresent(hand_sdk::service::Hand hand) const;
 
     // --- Tab 3: live readings and manual commands ----------------------------
 
@@ -109,4 +144,11 @@ private:
     std::array<QLabel*, kNumUiJoints> mc_left_labels_{};
     std::array<QLabel*, kNumUiJoints> mc_right_labels_{};
     std::array<QLineEdit*, kNumUiJoints> cmd_fields_{};
+    std::array<QCheckBox*, kNumUiJoints> calib_left_boxes_{};
+    std::array<QCheckBox*, kNumUiJoints> calib_right_boxes_{};
+    // What each box should be showing, kept beside the widgets so that a user
+    // untick can be undone without going back to the bus for an answer we
+    // already have.
+    std::array<bool, kNumUiJoints> calib_left_ticks_{};
+    std::array<bool, kNumUiJoints> calib_right_ticks_{};
 };
