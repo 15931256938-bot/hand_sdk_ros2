@@ -1,13 +1,13 @@
 /********************************************************************************
-** Form generated from reading UI file 'ethercat_sdk_nodeXYIhjy.ui'
+** Form generated from reading UI file 'ethercat_sdk_nodeqxrANs.ui'
 **
 ** Created by: Qt User Interface Compiler version 5.15.13
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
 ********************************************************************************/
 
-#ifndef ETHERCAT_SDK_NODEXYIHJY_H
-#define ETHERCAT_SDK_NODEXYIHJY_H
+#ifndef ETHERCAT_SDK_NODEQXRANS_H
+#define ETHERCAT_SDK_NODEQXRANS_H
 
 #include <QtCore/QVariant>
 #include <QtWidgets/QApplication>
@@ -1575,6 +1575,8 @@ public:
         select_all->setText(QCoreApplication::translate("MainWindow", "selectAll", nullptr));
         clear_all->setText(QCoreApplication::translate("MainWindow", "clearAll", nullptr));
         seed_pos->setText(QCoreApplication::translate("MainWindow", "seed current pos", nullptr));
+        kp_input->setText(QCoreApplication::translate("MainWindow", "1.0", nullptr));
+        kd_input->setText(QCoreApplication::translate("MainWindow", "0.005", nullptr));
         set_gains->setText(QCoreApplication::translate("MainWindow", "setGains", nullptr));
         label_28->setText(QCoreApplication::translate("MainWindow", "kp", nullptr));
         label_31->setText(QCoreApplication::translate("MainWindow", "kd", nullptr));
@@ -1698,4 +1700,4 @@ namespace Ui {
 
 QT_END_NAMESPACE
 
-#endif // ETHERCAT_SDK_NODEXYIHJY_H
+#endif // ETHERCAT_SDK_NODEQXRANS_H

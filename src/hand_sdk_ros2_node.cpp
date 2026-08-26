@@ -100,8 +100,8 @@ public:
         // Not applied at bring-up any more -- nothing is enabled unattended, so
         // there are no gains to set yet. Kept as the default the board's gains
         // control starts from.
-        declare_parameter<double>("initial_kp", 3.0);
-        declare_parameter<double>("initial_kd", 3.0);
+        declare_parameter<double>("initial_kp", 1.0);
+        declare_parameter<double>("initial_kd", 0.005);
         declare_parameter<double>("bringup_timeout_sec", 5.0);
         // The diagnostic board comes up with the node. Turn it off for headless
         // runs -- Qt needs a display and will fail hard without one.
