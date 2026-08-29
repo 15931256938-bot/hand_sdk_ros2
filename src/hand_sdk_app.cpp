@@ -203,8 +203,8 @@ HandAppWindow::HandAppWindow()
     cacheJointWidgets();
     wireButtons();
 
-    ui_.kp_input->setText(QStringLiteral("3.0"));
-    ui_.kd_input->setText(QStringLiteral("3.0"));
+    ui_.kp_input->setText(QStringLiteral("1.0"));
+    ui_.kd_input->setText(QStringLiteral("0.05"));
 
     poll_timer_ = new QTimer(this);
     poll_timer_->setInterval(20);  // 50 Hz
@@ -703,7 +703,7 @@ void HandAppWindow::onCalibClicked(hand_sdk::service::Hand hand, std::size_t joi
     // action" word and are not touched. ~10 ms on the GUI thread, one window.
     const auto result = api_->serviceZeroCalibrate(
         hand,
-        hand_sdk::service::ZeroCalDir::kSameAsEncoder,
+        hand_sdk::service::ZeroCalDir::kOpposite,
         hand_sdk::service::JointMask::single(joint));
 
     if (!result.success) {

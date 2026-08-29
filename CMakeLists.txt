@@ -13,6 +13,18 @@ find_package(sensor_msgs REQUIRED)
 
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
 
+# The installed executables carry file capabilities (setcap, see README), and
+# the loader ignores LD_LIBRARY_PATH for any file that has them. Without an
+# absolute RPATH the node dies at exec with "librclcpp.so: cannot open shared
+# object file" the moment setcap is applied. Two entries are enough: the ROS
+# distro's lib dir, and this package's own prefix for the typesupport library
+# generated below. Qt and libstdc++ live in the loader's default dirs.
+# Spelled out rather than via CMAKE_INSTALL_RPATH_USE_LINK_PATH, which would
+# also bake in the conda env that supplies libpython to the *_generator_py
+# libraries the linker drops anyway.
+get_filename_component(_ros_lib_dir "${rclcpp_DIR}/../../../lib" ABSOLUTE)
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib;${_ros_lib_dir}")
+
 rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SetGains.srv"
 )
@@ -24,6 +36,7 @@ add_executable(hand_sdk_ros2_node
   src/hand_sdk_ros2_node.cpp
   src/hand_sdk_node_board.cpp
 )
+target_link_options(hand_sdk_ros2_node PRIVATE -Wl,--disable-new-dtags)
 target_include_directories(hand_sdk_ros2_node PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_features(hand_sdk_ros2_node PRIVATE cxx_std_17)
 target_link_libraries(hand_sdk_ros2_node hand_sdk::hand_sdk Qt5::Widgets)
@@ -37,6 +50,7 @@ rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typ
 target_link_libraries(hand_sdk_ros2_node "${cpp_typesupport_target}")
 
 add_executable(hand_sdk_app src/hand_sdk_app.cpp)
+target_link_options(hand_sdk_app PRIVATE -Wl,--disable-new-dtags)
 target_include_directories(hand_sdk_app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_compile_features(hand_sdk_app PRIVATE cxx_std_17)
 target_link_libraries(hand_sdk_app

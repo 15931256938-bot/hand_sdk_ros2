@@ -1,13 +1,13 @@
 /********************************************************************************
-** Form generated from reading UI file 'ethercat_sdkwpeGJT.ui'
+** Form generated from reading UI file 'ethercat_sdkZhgMex.ui'
 **
 ** Created by: Qt User Interface Compiler version 5.15.13
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
 ********************************************************************************/
 
-#ifndef ETHERCAT_SDKWPEGJT_H
-#define ETHERCAT_SDKWPEGJT_H
+#ifndef ETHERCAT_SDKZHGMEX_H
+#define ETHERCAT_SDKZHGMEX_H
 
 #include <QtCore/QVariant>
 #include <QtWidgets/QApplication>
@@ -1775,13 +1775,13 @@ public:
     void retranslateUi(QMainWindow *MainWindow)
     {
         MainWindow->setWindowTitle(QCoreApplication::translate("MainWindow", "MainWindow", nullptr));
-        kd_input->setText(QCoreApplication::translate("MainWindow", "0.02", nullptr));
+        kd_input->setText(QCoreApplication::translate("MainWindow", "0.05", nullptr));
         label_36->setText(QCoreApplication::translate("MainWindow", "kp", nullptr));
         button_kpkd->setText(QCoreApplication::translate("MainWindow", "set kpkd", nullptr));
         result_connect->setText(QString());
         label_29->setText(QCoreApplication::translate("MainWindow", "2. check McState: active/standby", nullptr));
         button_ctrl->setText(QCoreApplication::translate("MainWindow", "set ctrl", nullptr));
-        kp_input->setText(QCoreApplication::translate("MainWindow", "2.0", nullptr));
+        kp_input->setText(QCoreApplication::translate("MainWindow", "1.0", nullptr));
         label_33->setText(QCoreApplication::translate("MainWindow", "4. set force control, enable", nullptr));
         label_37->setText(QCoreApplication::translate("MainWindow", "kd", nullptr));
         label_31->setText(QCoreApplication::translate("MainWindow", "3. set COM broadcast", nullptr));
@@ -2022,4 +2022,4 @@ namespace Ui {
 
 QT_END_NAMESPACE
 
-#endif // ETHERCAT_SDKWPEGJT_H
+#endif // ETHERCAT_SDKZHGMEX_H

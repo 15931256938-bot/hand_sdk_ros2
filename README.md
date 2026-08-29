@@ -48,14 +48,22 @@ Per the SDK README, capabilities go on the **final executable** — both of them
 
 ```bash
 cd ~/Documents/ros2_dev_ws
-sudo setcap cap_net_raw,cap_sys_nice+ep install/hand_sdk_ros2/lib/hand_sdk_ros2/hand_sdk_ros2_node
-sudo setcap cap_net_raw,cap_sys_nice+ep install/hand_sdk_ros2/lib/hand_sdk_ros2/hand_sdk_app
+sudo setcap cap_net_admin,cap_net_raw,cap_sys_nice+ep install/hand_sdk_ros2/lib/hand_sdk_ros2/hand_sdk_ros2_node
+sudo setcap cap_net_admin,cap_net_raw,cap_sys_nice+ep install/hand_sdk_ros2/lib/hand_sdk_ros2/hand_sdk_app
 ```
 
 Check with `getcap <binary>`.
 
 > colcon overwrites the installed binaries on every build, which **wipes the
 > capabilities**. Re-run both `setcap` lines after each `colcon build`.
+
+> A file with capabilities is a secure-execution binary, so the loader throws
+> `LD_LIBRARY_PATH` away — the variable the ROS setup files rely on. Without a
+> countermeasure the node dies at exec with `librclcpp.so: cannot open shared
+> object file`, even in a correctly sourced shell. `CMakeLists.txt` therefore
+> gives both executables an absolute `RPATH` covering `/opt/ros/<distro>/lib`
+> and this package's own `lib/`. If you move the workspace or switch distros,
+> rebuild — the paths are baked in at link time.
 
 ## 3. Bring the EtherCAT NIC up
 
@@ -110,6 +118,10 @@ Parameters: `interface_name`, `left_hand_name`, `right_hand_name`,
 `publish_rate_hz` (100), `initial_kp` / `initial_kd` (3.0 — no longer applied at
 bring-up; the default the board's gains control starts from),
 `bringup_timeout_sec` (5.0), `board` (true).
+
+Which motors are fitted backwards is **not** a parameter: it is the
+`kLeftJointDirection` / `kRightJointDirection` table in the SDK's `config.hpp`.
+`joint_states` and `joint_command` are always in model sign.
 
 Qt owns the main thread and ROS spins beside it. Closing the board window stops
 the node; Ctrl-C stops both.
