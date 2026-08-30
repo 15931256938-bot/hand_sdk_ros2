@@ -1,67 +1,115 @@
 #include "hand_sdk_node_board.hpp"
 
 #include <QCheckBox>
-#include <QLineEdit>
 #include <QDateTime>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QStringList>
 #include <QTextEdit>
 
+#include <algorithm>
 #include <cmath>
 
 namespace
 {
-// 10Hz
+
+constexpr double kRadToDeg = 180.0 / M_PI;
+
+// The readings tab redraws from the node's last published sample. 10 Hz: fast
+// enough to watch a motor move, slow enough that the grid is readable.
 constexpr int kRefreshMs = 100;
 
-const char* mcStateName(hand_sdk::service::McState state)
+// s16en11 on the wire: at or past +-16 the value saturates at the INT16 rail
+// instead of wrapping, so the device would quietly run a gain nobody asked for.
+// Refused rather than clamped -- a silently different gain is worse than a
+// button that did nothing.
+constexpr double kGainWireLimit = 16.0;
+
+// How many of a hand's motors answered, as a verdict: all of them, some of
+// them, or none.
+Verdict tally(int reached, int total)
+{
+    if (total <= 0) {
+        return Verdict::kFail;   // nothing was even attempted
+    }
+    if (reached >= total) {
+        return Verdict::kPass;
+    }
+    return reached > 0 ? Verdict::kPartial : Verdict::kFail;
+}
+
+bool contains(const std::vector<hand_sdk::service::Hand>& hands, hand_sdk::service::Hand hand)
+{
+    return std::find(hands.begin(), hands.end(), hand) != hands.end();
+}
+
+QString verdictTag(Verdict verdict)
+{
+    switch (verdict) {
+    case Verdict::kPass:    return QStringLiteral("OK");
+    case Verdict::kPartial: return QStringLiteral("PARTIAL");
+    case Verdict::kFail:    return QStringLiteral("FAILED");
+    }
+    return QStringLiteral("?");
+}
+
+QString handName(hand_sdk::service::Hand hand)
+{
+    return hand == hand_sdk::service::Hand::kLeft ? QStringLiteral("left")
+                                                  : QStringLiteral("right");
+}
+
+QString mcStateName(hand_sdk::service::McState state)
 {
     switch (state) {
-    case hand_sdk::service::McState::kNone:    return "none";
-    case hand_sdk::service::McState::kInit:    return "init";
-    case hand_sdk::service::McState::kStandby: return "standby";
-    case hand_sdk::service::McState::kActive:  return "active";
-    case hand_sdk::service::McState::kFault:   return "FAULT";
+    case hand_sdk::service::McState::kNone:    return QStringLiteral("none");
+    case hand_sdk::service::McState::kInit:    return QStringLiteral("init");
+    case hand_sdk::service::McState::kStandby: return QStringLiteral("standby");
+    case hand_sdk::service::McState::kActive:  return QStringLiteral("active");
+    case hand_sdk::service::McState::kFault:   return QStringLiteral("FAULT");
     }
-    return "?";
+    return QStringLiteral("unknown");
 }
 
 // Only the bits the vendor documents; anything else shows as its raw value.
 QString faultNames(uint32_t code)
 {
-    if (code == hand_sdk::service::fault::kNone) {
+    using namespace hand_sdk::service;
+
+    if (code == fault::kNone) {
         return {};
     }
+
     struct Bit { uint32_t mask; const char* name; };
     static const Bit kBits[] = {
-        {hand_sdk::service::fault::kOverCurrent,  "over-current"},
-        {hand_sdk::service::fault::kOverVoltage,  "over-voltage"},
-        {hand_sdk::service::fault::kUnderVoltage, "under-voltage"},
-        {hand_sdk::service::fault::kStall,        "stall"},
-        {hand_sdk::service::fault::kOverTemp,     "over-temp"},
-        {hand_sdk::service::fault::kCurrentZero,  "current-zero"},
-        {hand_sdk::service::fault::kPosNotSync,   "pos-not-sync"},
-        {hand_sdk::service::fault::kOverSpeed,    "over-speed"},
-        {hand_sdk::service::fault::kHardware,     "hardware"},
+        {fault::kOverCurrent,  "over-current"},
+        {fault::kOverVoltage,  "over-voltage"},
+        {fault::kUnderVoltage, "under-voltage"},
+        {fault::kStall,        "stall"},
+        {fault::kOverTemp,     "over-temp"},
+        {fault::kCurrentZero,  "current-zero"},
+        {fault::kPosNotSync,   "pos-not-sync"},
+        {fault::kOverSpeed,    "over-speed"},
+        {fault::kHardware,     "hardware"},
     };
 
     QStringList names;
     uint32_t seen = 0;
     for (const auto& bit : kBits) {
-        if (code & bit.mask) {
-            names << bit.name;
+        if ((code & bit.mask) != 0u) {
+            names << QString::fromLatin1(bit.name);
             seen |= bit.mask;
         }
     }
     if (const uint32_t rest = code & ~seen) {
-        names << QString("0x%1").arg(rest, 0, 16);
+        names << QStringLiteral("0x%1").arg(rest, 0, 16);
     }
-    return names.join(",");
+    return names.join(QLatin1Char(','));
 }
 
-// pos_zero_calibration_state as a checkbox caption: the raw code the device
-// reported, then a word for it. Ten columns of these sit side by side, so the
-// caption stays short and the spelled-out name goes in the tooltip.
+// pos_zero_calibration_state as a grid cell: the raw code the device reported,
+// then a word for it. Ten columns of these sit side by side, so the cell stays
+// short and the spelled-out name goes in the tooltip.
 QString zeroCalTag(hand_sdk::service::ZeroCalState state)
 {
     switch (state) {
@@ -72,138 +120,369 @@ QString zeroCalTag(hand_sdk::service::ZeroCalState state)
     }
     // A code outside the vendor table: shown raw rather than rounded to the
     // nearest known one.
-    return QString("%1 ?").arg(static_cast<int>(state));
+    return QStringLiteral("%1 ?").arg(static_cast<int>(state));
 }
 
-const char* handLabel(hand_sdk::service::Hand hand)
-{
-    return hand == hand_sdk::service::Hand::kLeft ? "left" : "right";
-}
 } // namespace
 
-HandNodeBoard::HandNodeBoard(BoardSource& source)
+HandNodeBoard::HandNodeBoard(BoardSource& source, double initial_kp, double initial_kd)
     : source_(source)
 {
     ui_.setupUi(this);
     cacheWidgets();
-    ensureCtrlResultLabel();
     wireButtons();
 
-    ui_.render_state_type->setText("--");
-    clearStateColumn(hand_sdk::service::Hand::kLeft, "-");
-    clearStateColumn(hand_sdk::service::Hand::kRight, "-");
+    ui_.kp_input->setText(QString::number(initial_kp, 'g', 6));
+    ui_.kd_input->setText(QString::number(initial_kd, 'g', 6));
+
+    // Not a verdict -- nothing has been tried yet, and nothing can be until the
+    // bus is up.
+    setStateKind(QStringLiteral("--"));
+    clearStateGrid(QStringLiteral("-"));
+    ui_.ctrl_cmd_result->setText(QStringLiteral("--"));
+    ui_.ctrl_cmd_result->setStyleSheet(QStringLiteral("color: gray;"));
 
     refresh_timer_ = new QTimer(this);
     refresh_timer_->setInterval(kRefreshMs);
     connect(refresh_timer_, &QTimer::timeout, this, [this]() { onRefresh(); });
     refresh_timer_->start();
 
-    appendLog(QString("board up: left=%1 right=%2")
-                  .arg(source_.present(hand_sdk::service::Hand::kLeft) ? "yes" : "no")
-                  .arg(source_.present(hand_sdk::service::Hand::kRight) ? "yes" : "no"));
+    appendLog(QStringLiteral("board up, bus down -- press connect"));
 }
 
-// --- setup -----------------------------------------------------------------
+// --- setup ------------------------------------------------------------------
 
 void HandNodeBoard::cacheWidgets()
 {
     // The readings grid is flat (readpos0..19); the states grid is per finger
-    // and joint (state_l_FJ), so it is walked as finger * 4 + joint -- the same
-    // index the joint names and the SDK's JointMask use.
-    const auto label = [this](const char* format, int index) {
-        return findChild<QLabel*>(QString::asprintf(format, index));
-    };
-
+    // and joint (state_l_FJ, calib_l_FJ), so it is walked as finger * 4 + joint
+    // -- the same index the joint names and the SDK's JointMask use, and the
+    // same mapping hand_sdk_app uses for the identical grid.
     for (std::size_t i = 0; i < kNumBoardJoints; ++i) {
-        const int n = static_cast<int>(i);
-        pos_labels_[i] = label("readpos%d", n);
-        vel_labels_[i] = label("readvel%d", n);
-        tau_labels_[i] = label("readtau%d", n);
-        err_labels_[i] = label("error%d", n);
+        const int index = static_cast<int>(i);
+        const int finger = index / 4;
+        const int joint = index % 4;
 
-        const int finger = n / 4;
-        const int joint = n % 4;
-        state_left_[i] = findChild<QLabel*>(QString::asprintf("state_l_%d%d", finger, joint));
-        state_right_[i] = findChild<QLabel*>(QString::asprintf("state_r_%d%d", finger, joint));
-        check_left_[i] = findChild<QCheckBox*>(QString::asprintf("check_l_%d%d", finger, joint));
-        check_right_[i] = findChild<QCheckBox*>(QString::asprintf("check_r_%d%d", finger, joint));
+        pos_labels_[i] = findChild<QLabel*>(QStringLiteral("readpos%1").arg(index));
+        vel_labels_[i] = findChild<QLabel*>(QStringLiteral("readvel%1").arg(index));
+        tau_labels_[i] = findChild<QLabel*>(QStringLiteral("readtau%1").arg(index));
+        err_labels_[i] = findChild<QLabel*>(QStringLiteral("error%1").arg(index));
+
+        state_left_[i] =
+            findChild<QLabel*>(QStringLiteral("state_l_%1%2").arg(finger).arg(joint));
+        state_right_[i] =
+            findChild<QLabel*>(QStringLiteral("state_r_%1%2").arg(finger).arg(joint));
+        check_left_[i] =
+            findChild<QCheckBox*>(QStringLiteral("calib_l_%1%2").arg(finger).arg(joint));
+        check_right_[i] =
+            findChild<QCheckBox*>(QStringLiteral("calib_r_%1%2").arg(finger).arg(joint));
     }
-}
-
-// The .ui has no result label for the enable/disable buttons, so one is made
-// here -- but only if the .ui has not grown one since. Name it
-// `ctrl_cmd_result` there and this picks it up instead of adding a second.
-void HandNodeBoard::ensureCtrlResultLabel()
-{
-    ctrl_result_ = findChild<QLabel*>("ctrl_cmd_result");
-    if (ctrl_result_ != nullptr) {
-        return;
-    }
-
-    ctrl_result_ = new QLabel(ui_.tab);
-    ctrl_result_->setObjectName("ctrl_cmd_result");
-    // Directly under ctrl_cmd_disable, which sits at (610, 140, 151, 31).
-    ctrl_result_->setGeometry(QRect(610, 178, 360, 25));
-    ctrl_result_->setText("--");
-    ctrl_result_->show();
 }
 
 void HandNodeBoard::wireButtons()
 {
-    connect(ui_.button_mc_state, &QPushButton::clicked, this, [this]() { onMcState(); });
-    connect(ui_.button_ctrl_state, &QPushButton::clicked, this, [this]() { onCtrlState(); });
+    connect(ui_.button_connect, &QPushButton::clicked, this, [this]() { onConnect(); });
+    connect(ui_.button_com, &QPushButton::clicked, this, [this]() { onComm(); });
+    connect(ui_.seed_pos, &QPushButton::clicked, this, [this]() { onSeedPos(); });
     connect(ui_.ctrl_cmd_enable, &QPushButton::clicked, this, [this]() { onSetEnable(true); });
     connect(ui_.ctrl_cmd_disable, &QPushButton::clicked, this, [this]() { onSetEnable(false); });
-    connect(ui_.set_com_all_button, &QPushButton::clicked, this, [this]() { onSetComAll(); });
-    connect(ui_.zero_calibrate, &QPushButton::clicked, this, [this]() { onZeroCalibrate(); });
+
+    connect(ui_.button_mc_state, &QPushButton::clicked, this, [this]() { onMcState(); });
     connect(ui_.calibrate_state, &QPushButton::clicked, this, [this]() { onCalibrateState(); });
-    connect(ui_.seed_pos, &QPushButton::clicked, this, [this]() { onSeedPos(); });
     // The read-gains button kept uic's default name in the .ui.
     connect(ui_.pushButton, &QPushButton::clicked, this, [this]() { onReadGains(); });
+
+    connect(ui_.zero_calibrate, &QPushButton::clicked, this, [this]() { onZeroCalibrate(); });
     connect(ui_.set_gains, &QPushButton::clicked, this, [this]() { onSetGains(); });
 
-    // Selection only. The boxes carry no handler of their own -- nothing the
-    // device says is allowed to move a tick, so there is nothing to react to.
+    // Selection only. The boxes carry no handler of their own -- clicking one
+    // puts nothing on the wire, so there is nothing to react to.
     connect(ui_.select_all, &QPushButton::clicked, this, [this]() { setAllChecks(true); });
     connect(ui_.clear_all, &QPushButton::clicked, this, [this]() { setAllChecks(false); });
 
     connect(ui_.quit, &QPushButton::clicked, this, [this]() { close(); });
 }
 
-// --- states tab -------------------------------------------------------------
+// --- helpers ----------------------------------------------------------------
+
+void HandNodeBoard::appendLog(const QString& text)
+{
+    const auto stamp = QDateTime::currentDateTime().toString(QStringLiteral("HH:mm:ss.zzz"));
+    ui_.log->append(QStringLiteral("[%1] %2").arg(stamp, text));
+}
+
+void HandNodeBoard::setCtrlResult(Verdict verdict, const QString& text, const QString& detail)
+{
+    ui_.ctrl_cmd_result->setText(text);
+    ui_.ctrl_cmd_result->setToolTip(detail);
+    switch (verdict) {
+    case Verdict::kPass:
+        ui_.ctrl_cmd_result->setStyleSheet(QStringLiteral("color: green;"));
+        break;
+    case Verdict::kPartial:
+        // Amber, not red: the step did something, and the next one is worth
+        // pressing.
+        ui_.ctrl_cmd_result->setStyleSheet(QStringLiteral("color: #b8860b;"));
+        break;
+    case Verdict::kFail:
+        ui_.ctrl_cmd_result->setStyleSheet(QStringLiteral("color: red;"));
+        break;
+    }
+    appendLog(detail);
+}
+
+bool HandNodeBoard::requireConnected(const QString& what)
+{
+    if (source_.api() != nullptr &&
+        (source_.present(hand_sdk::service::Hand::kLeft) ||
+         source_.present(hand_sdk::service::Hand::kRight))) {
+        return true;
+    }
+    appendLog(QStringLiteral("%1 rejected: not connected").arg(what));
+    return false;
+}
+
+std::vector<hand_sdk::service::Hand> HandNodeBoard::presentHands() const
+{
+    using hand_sdk::service::Hand;
+
+    std::vector<Hand> hands;
+    for (const auto hand : {Hand::kLeft, Hand::kRight}) {
+        if (source_.present(hand)) {
+            hands.push_back(hand);
+        }
+    }
+    return hands;
+}
+
+// --- tab 1: the bus ---------------------------------------------------------
+
+void HandNodeBoard::onConnect()
+{
+    if (source_.api() != nullptr) {
+        const auto summary = QString::fromStdString(source_.disconnectBus());
+        ui_.button_connect->setText(QStringLiteral("connect"));
+        setStateKind(QStringLiteral("--"));
+        clearStateGrid(QStringLiteral("-"));
+        ui_.ctrl_cmd_result->setText(QStringLiteral("--"));
+        ui_.ctrl_cmd_result->setStyleSheet(QStringLiteral("color: gray;"));
+        appendLog(QStringLiteral("disconnected | %1").arg(summary));
+        return;
+    }
+
+    const auto connected = source_.connectBus();
+    if (!connected.success) {
+        appendLog(QStringLiteral("connect failed: %1")
+                      .arg(QString::fromStdString(connected.msg)));
+        return;
+    }
+
+    // One hand on the bus is a normal rig, not a half-failure, so this is a
+    // plain pass whenever the bus answered at all.
+    const auto summary =
+        QStringLiteral("left=%1 right=%2 dc=%3")
+            .arg(connected.has_left ? QStringLiteral("yes") : QStringLiteral("no"),
+                 connected.has_right ? QStringLiteral("yes") : QStringLiteral("no"),
+                 connected.dc_active ? QStringLiteral("armed") : QStringLiteral("off"));
+    ui_.button_connect->setText(QStringLiteral("disconnect"));
+    clearStateGrid(QStringLiteral("-"));
+    appendLog(QStringLiteral("connected: %1").arg(summary));
+
+    if (!connected.has_left && !connected.has_right) {
+        appendLog(QStringLiteral("bus is up but reported no hands -- check power and cabling"));
+    }
+}
+
+void HandNodeBoard::onComm()
+{
+    if (!requireConnected(QStringLiteral("set com all"))) {
+        return;
+    }
+
+    const auto hands = presentHands();
+    std::vector<hand_sdk::service::Hand> started;
+    std::vector<QString> notes(hands.size());
+
+    for (std::size_t i = 0; i < hands.size(); ++i) {
+        // cmd 4 is broadcast to every joint by construction -- there is no mask
+        // on it, so the ticks play no part here. The SDK's message either way:
+        // on a pass it says how many motors echoed the command, on a failure
+        // which ones did not.
+        const auto result =
+            source_.api()->serviceComm(hands[i], hand_sdk::service::ComCmd::kStartBroadcast);
+        if (result.success) {
+            started.push_back(hands[i]);
+        }
+        notes[i] = QString::fromStdString(result.msg);
+    }
+
+    // Seeding runs on every present hand, whatever the broadcast step did, and
+    // whatever any joint's calibration state is: seeding latches the pose the
+    // device is reporting *now*, in whatever frame it is currently using, so it
+    // is always correct at the moment it is taken.
+    //
+    // What it cannot survive is the frame moving afterwards. Zero-calibrating a
+    // joint redefines its origin, so a pose latched before that calibration
+    // refers to an origin the device has since dropped. The rule is therefore
+    // "seed last", not "seed only calibrated joints" -- press `seed current
+    // pos` again after any calibration and before enabling control.
+    QString seed_detail;
+    const auto seeded = seedHands(hands, seed_detail);
+
+    int passed = 0;
+    QStringList parts;
+    for (std::size_t i = 0; i < hands.size(); ++i) {
+        const bool did_start = contains(started, hands[i]);
+        const bool did_seed = contains(seeded, hands[i]);
+        if (did_start && did_seed) {
+            ++passed;
+        }
+        // Both halves always shown, so "broadcast on, NOT seeded" and "timed
+        // out, seeded" are told apart at a glance. Only a hand with both counts
+        // as passed.
+        parts << QStringLiteral("%1: %2, %3")
+                     .arg(handName(hands[i]), notes[i],
+                          did_seed ? QStringLiteral("seeded") : QStringLiteral("NOT seeded"));
+    }
+
+    // One hand broadcasting and holding its pose is enough to go on with; that
+    // hand can be driven while the other is looked at.
+    const auto verdict = tally(passed, static_cast<int>(hands.size()));
+    setCtrlResult(verdict, verdictTag(verdict),
+                  QStringLiteral("set com: %1 | %2 | %3")
+                      .arg(verdictTag(verdict), parts.join(QStringLiteral(" | ")), seed_detail));
+}
+
+std::vector<hand_sdk::service::Hand> HandNodeBoard::seedHands(
+    const std::vector<hand_sdk::service::Hand>& hands, QString& detail)
+{
+    if (hands.empty()) {
+        detail = QStringLiteral("seed: skipped, no hand to seed");
+        return {};
+    }
+
+    // Whole hand, not the ticked joints: a command frame carries all twenty-one
+    // slots and there is no "no action" word on the data path, so there is no
+    // such thing as seeding a subset. The ticks belong to the service writes.
+    std::vector<hand_sdk::service::Hand> seeded;
+    for (const auto hand : hands) {
+        if (source_.seedFromState(hand)) {
+            seeded.push_back(hand);
+        }
+    }
+
+    if (seeded.empty()) {
+        detail = QStringLiteral("seed: no state to hold");
+        return {};
+    }
+
+    QStringList names;
+    for (const auto hand : seeded) {
+        names << handName(hand);
+    }
+    detail = QStringLiteral("hold pose seeded (%1)").arg(names.join(QLatin1Char(',')));
+    return seeded;
+}
+
+void HandNodeBoard::onSeedPos()
+{
+    if (!requireConnected(QStringLiteral("seed current pos"))) {
+        return;
+    }
+
+    const auto hands = presentHands();
+    QString detail;
+    const auto seeded = seedHands(hands, detail);
+
+    const auto verdict = tally(static_cast<int>(seeded.size()), static_cast<int>(hands.size()));
+    setCtrlResult(verdict, verdictTag(verdict), QStringLiteral("seed: %1").arg(detail));
+}
+
+void HandNodeBoard::onSetEnable(bool enable)
+{
+    const QString what = enable ? QStringLiteral("enable ctrl") : QStringLiteral("disable ctrl");
+    if (!requireConnected(what)) {
+        return;
+    }
+
+    const auto hands = presentHands();
+    QStringList parts;
+    int took_total = 0;
+
+    for (const auto hand : hands) {
+        // Every active joint, not the ticked ones: turning the hand on is not a
+        // per-motor operation, and this is the same call the app's `set ctrl`
+        // makes. The ticks are for zero_calibrate and setGains.
+        const auto result =
+            source_.api()->serviceMode(hand, hand_sdk::service::LoopMode::kForceControl, enable,
+                                       hand_sdk::service::JointMask::active());
+
+        for (std::size_t i = 0; i < hand_sdk::frames::kNumActiveJoints; ++i) {
+            if (hand_sdk::service::took(result.value[i],
+                                        hand_sdk::service::LoopMode::kForceControl, enable)) {
+                ++took_total;
+            }
+        }
+        parts << QStringLiteral("%1: %2").arg(handName(hand),
+                                              QString::fromStdString(result.msg));
+    }
+
+    const auto verdict =
+        tally(took_total, static_cast<int>(hands.size() * hand_sdk::frames::kNumActiveJoints));
+    // The state grid is deliberately not repainted here: it shows the last
+    // thing you asked to *read*, and a write quietly refilling it would blur
+    // "what I read" with "what I just did". Press mc_state for the new state.
+    setCtrlResult(verdict,
+                  enable ? QStringLiteral("enabled") : QStringLiteral("disabled"),
+                  QStringLiteral("%1: %2 | %3")
+                      .arg(what, verdictTag(verdict), parts.join(QStringLiteral(" | "))));
+}
+
+// --- tab 1: the three reads that share the state grid ------------------------
 
 template <typename Call>
 void HandNodeBoard::forEachHand(const QString& what, Call call)
 {
     using hand_sdk::service::Hand;
 
-    bool any = false;
+    QStringList parts;
+    int ok = 0;
+    int tried = 0;
+
     for (const auto hand : {Hand::kLeft, Hand::kRight}) {
         if (!source_.present(hand)) {
-            clearStateColumn(hand, "-");
+            clearStateColumn(hand, QStringLiteral("-"));
             continue;
         }
-        any = true;
+        ++tried;
+
         // ~10 ms on the GUI thread: one bus window, below the blink threshold.
-        // It can still fail outright if a ROS set_gains owns the channel, which
-        // is reported rather than retried.
+        // It can still fail outright if a ROS set_gains owns the service
+        // channel, which is reported rather than retried.
         const QString error = call(hand);
         if (error.isEmpty()) {
-            appendLog(QString("%1 %2: ok").arg(handLabel(hand), what));
+            ++ok;
+            parts << QStringLiteral("%1: ok").arg(handName(hand));
         } else {
-            clearStateColumn(hand, "err");
-            appendLog(QString("%1 %2 FAILED: %3").arg(handLabel(hand), what, error));
+            clearStateColumn(hand, QStringLiteral("err"));
+            parts << QStringLiteral("%1: %2").arg(handName(hand), error);
         }
     }
-    if (!any) {
-        appendLog(QString("%1: no hands present").arg(what));
-    }
+
+    const auto verdict = tally(ok, tried);
+    setCtrlResult(verdict, verdictTag(verdict),
+                  QStringLiteral("%1: %2 | %3")
+                      .arg(what, verdictTag(verdict), parts.join(QStringLiteral(" | "))));
 }
 
 void HandNodeBoard::onMcState()
 {
-    ui_.render_state_type->setText("mc_state");
-    forEachHand("mc_state", [this](hand_sdk::service::Hand hand) {
+    if (!requireConnected(QStringLiteral("mc_state"))) {
+        return;
+    }
+
+    setStateKind(QStringLiteral("mc_state"));
+    forEachHand(QStringLiteral("mc_state"), [this](hand_sdk::service::Hand hand) {
         const auto result = source_.api()->serviceMcState(hand);
         if (!result.success) {
             return QString::fromStdString(result.msg);
@@ -213,17 +492,152 @@ void HandNodeBoard::onMcState()
     });
 }
 
-void HandNodeBoard::onCtrlState()
+void HandNodeBoard::onCalibrateState()
 {
-    ui_.render_state_type->setText("ctrl_state");
-    forEachHand("ctrl_state", [this](hand_sdk::service::Hand hand) {
-        const auto result = source_.api()->serviceModeQuery(hand);
+    if (!requireConnected(QStringLiteral("calibrate state"))) {
+        return;
+    }
+
+    // The read half of cmd 10, and the only one of the pair that touches the
+    // screen: it reads every joint, ticked or not, because this is the state of
+    // the hand and not a report on the selection.
+    setStateKind(QStringLiteral("calib state"));
+    forEachHand(QStringLiteral("calibrate state"), [this](hand_sdk::service::Hand hand) {
+        const auto result = source_.api()->serviceZeroCalibrateState(hand);
         if (!result.success) {
             return QString::fromStdString(result.msg);
         }
-        renderCtrlState(hand, result.value);
+        renderCalibState(hand, result.value);
         return QString();
     });
+}
+
+void HandNodeBoard::onReadGains()
+{
+    if (!requireConnected(QStringLiteral("read_gains"))) {
+        return;
+    }
+
+    setStateKind(QStringLiteral("gains kp/kd"));
+    forEachHand(QStringLiteral("read gains"), [this](hand_sdk::service::Hand hand) {
+        const auto result = source_.api()->serviceGainsQuery(hand);
+        if (!result.success) {
+            return QString::fromStdString(result.msg);
+        }
+        renderGains(hand, result.value);
+        return QString();
+    });
+}
+
+// --- tab 1: the two writes aimed at the ticked joints ------------------------
+
+void HandNodeBoard::onZeroCalibrate()
+{
+    if (!requireConnected(QStringLiteral("zero calibrate"))) {
+        return;
+    }
+
+    QStringList parts;
+    int done = 0;
+    int tried = 0;
+
+    for (const auto hand : presentHands()) {
+        const auto mask = checkedMask(hand);
+        if (!mask.any()) {
+            parts << QStringLiteral("%1: nothing ticked").arg(handName(hand));
+            continue;
+        }
+        ++tried;
+
+        // No interlock against force control being enabled on these joints.
+        // This is a bench control panel, so each button does its own service
+        // call and nothing else. Calibrating a joint that is currently being
+        // held will have the loop and the routine fighting over the motor; that
+        // is the operator's call to make, not this window's.
+        const auto result = source_.api()->serviceZeroCalibrate(
+            hand, hand_sdk::service::ZeroCalDir::kSameAsEncoder, mask);
+        if (result.success) {
+            ++done;
+        }
+        parts << QStringLiteral("%1: %2 joints, %3")
+                     .arg(handName(hand))
+                     .arg(static_cast<int>(mask.count()))
+                     .arg(QString::fromStdString(result.msg));
+    }
+
+    // Neither the ticks nor the grid move. The ticks are the selection that was
+    // just written to, and the state is something this call has only asked to
+    // start changing -- the routine runs for seconds past the service window.
+    // Press `calibrate state` to see where it got to.
+    const auto verdict = tally(done, tried);
+    setCtrlResult(verdict, verdictTag(verdict),
+                  QStringLiteral("zero-cal: %1 | %2")
+                      .arg(verdictTag(verdict), parts.join(QStringLiteral(" | "))));
+}
+
+void HandNodeBoard::onSetGains()
+{
+    if (!requireConnected(QStringLiteral("setGains"))) {
+        return;
+    }
+
+    bool kp_ok = false;
+    bool kd_ok = false;
+    const double kp = ui_.kp_input->text().toDouble(&kp_ok);
+    const double kd = ui_.kd_input->text().toDouble(&kd_ok);
+    if (!kp_ok || !kd_ok) {
+        setCtrlResult(Verdict::kFail, QStringLiteral("bad kp/kd"),
+                      QStringLiteral("gains: kp and kd must be numbers"));
+        return;
+    }
+    if (std::fabs(kp) >= kGainWireLimit || std::fabs(kd) >= kGainWireLimit) {
+        setCtrlResult(Verdict::kFail, QStringLiteral("out of range"),
+                      QStringLiteral("gains: |kp| and |kd| must be < %1 (s16en11 wire range)")
+                          .arg(kGainWireLimit));
+        return;
+    }
+
+    QStringList parts;
+    int done = 0;
+    int tried = 0;
+    bool wrote = false;
+
+    for (const auto hand : presentHands()) {
+        const auto mask = checkedMask(hand);
+        if (!mask.any()) {
+            parts << QStringLiteral("%1: nothing ticked").arg(handName(hand));
+            continue;
+        }
+        ++tried;
+
+        const auto result = source_.api()->serviceGains(hand, static_cast<float>(kp),
+                                                        static_cast<float>(kd), mask);
+        if (result.success) {
+            ++done;
+        }
+        wrote = true;
+        parts << QStringLiteral("%1: %2 joints, %3")
+                     .arg(handName(hand))
+                     .arg(static_cast<int>(mask.count()))
+                     .arg(QString::fromStdString(result.msg));
+    }
+
+    const auto verdict = tally(done, tried);
+    const auto detail = QStringLiteral("gains kp=%1 kd=%2: %3 | %4")
+                            .arg(kp, 0, 'f', 3)
+                            .arg(kd, 0, 'f', 3)
+                            .arg(verdictTag(verdict), parts.join(QStringLiteral(" | ")));
+
+    // Refilled from a *fresh read*, not from the write's own reply: a masked
+    // write only answers for the joints it addressed, and the rest were sent
+    // the ignore word. onReadGains() asks for all twenty properly -- and it
+    // overwrites this call's verdict label, so the detail goes in first.
+    appendLog(detail);
+    if (wrote) {
+        onReadGains();
+        return;
+    }
+    setCtrlResult(verdict, verdictTag(verdict), detail);
 }
 
 // --- the tick table ---------------------------------------------------------
@@ -239,11 +653,12 @@ const std::array<QCheckBox*, kNumBoardJoints>& HandNodeBoard::checkBoxes(
     return hand == hand_sdk::service::Hand::kLeft ? check_left_ : check_right_;
 }
 
-// Captions deliberately untouched: they are what `calibrate state` last read,
-// and re-selecting which motors to write to does not make that stale.
 void HandNodeBoard::setAllChecks(bool on)
 {
     using hand_sdk::service::Hand;
+
+    // The boxes are a selection the operator owns, so this moves ticks on both
+    // hands whether or not either is on the bus.
     for (const auto hand : {Hand::kLeft, Hand::kRight}) {
         for (auto* box : checkBoxes(hand)) {
             if (box != nullptr) {
@@ -251,7 +666,8 @@ void HandNodeBoard::setAllChecks(bool on)
             }
         }
     }
-    appendLog(on ? QString("selected all joints") : QString("cleared all joints"));
+    appendLog(on ? QStringLiteral("selected all joints")
+                 : QStringLiteral("cleared all joints"));
 }
 
 hand_sdk::service::JointMask HandNodeBoard::checkedMask(hand_sdk::service::Hand hand) const
@@ -266,345 +682,11 @@ hand_sdk::service::JointMask HandNodeBoard::checkedMask(hand_sdk::service::Hand 
     return mask;
 }
 
-void HandNodeBoard::setCheckCaptions(hand_sdk::service::Hand hand,
-                                     const QString& text, const QString& tip)
+// --- the state grid ---------------------------------------------------------
+
+void HandNodeBoard::setStateKind(const QString& kind)
 {
-    for (auto* box : checkBoxes(hand)) {
-        if (box != nullptr) {
-            box->setText(text);
-            box->setToolTip(tip);
-        }
-    }
-}
-
-// --- writes against the ticked joints ---------------------------------------
-
-void HandNodeBoard::onSetEnable(bool enable)
-{
-    using hand_sdk::service::Hand;
-
-    const QString what = enable ? QStringLiteral("enable") : QStringLiteral("disable");
-
-    QStringList done;
-    QStringList failed;
-    int written = 0;
-
-    for (const auto hand : {Hand::kLeft, Hand::kRight}) {
-        if (!source_.present(hand)) {
-            continue;
-        }
-
-        const auto mask = checkedMask(hand);
-        if (!mask.any()) {
-            failed << QString("%1: nothing ticked").arg(handLabel(hand));
-            continue;
-        }
-
-        // Only the ticked motors are addressed; the rest get the device's "no
-        // action" word and keep running exactly as they were.
-        const auto result = source_.api()->serviceMode(
-            hand, hand_sdk::service::LoopMode::kForceControl, enable, mask);
-        ++written;
-
-        appendLog(QString("%1 %2 %3 joints: %4")
-                      .arg(handLabel(hand), what)
-                      .arg(static_cast<int>(mask.count()))
-                      .arg(QString::fromStdString(result.msg)));
-
-        if (result.success) {
-            done << QString("%1 %2j").arg(handLabel(hand)).arg(static_cast<int>(mask.count()));
-        } else {
-            failed << QString("%1: %2").arg(handLabel(hand), QString::fromStdString(result.msg));
-        }
-    }
-
-    if (done.isEmpty() && failed.isEmpty()) {
-        setCtrlResult(false, QString("%1: no hands present").arg(what));
-        return;
-    }
-
-    // The cells are refilled from a *fresh read*, not from the write's own
-    // reply. A masked write only answers for the joints it addressed: the rest
-    // were sent the ignore word, and a slot that echoes 0xFFFF back decodes as
-    // mode 0xFF with the enable bit set -- which would paint an untouched joint
-    // as enabled. onCtrlState() asks for all twenty properly.
-    if (written > 0) {
-        onCtrlState();
-    }
-
-    if (failed.isEmpty()) {
-        setCtrlResult(true, QString("%1: ok (%2)").arg(what, done.join(", ")));
-        return;
-    }
-    setCtrlResult(false, QString("%1: %2%3")
-                             .arg(what, failed.join("; "),
-                                  done.isEmpty() ? QString() : QString(" | ok: %1").arg(done.join(", "))));
-}
-
-void HandNodeBoard::onSetComAll()
-{
-    using hand_sdk::service::Hand;
-
-    QStringList done;
-    QStringList failed;
-    for (const auto hand : {Hand::kLeft, Hand::kRight}) {
-        if (!source_.present(hand)) {
-            continue;
-        }
-        // cmd 4 is broadcast to every joint by construction -- there is no mask
-        // on it, so the ticks play no part here.
-        const auto result = source_.api()->serviceComm(hand, hand_sdk::service::ComCmd::kStartBroadcast);
-        appendLog(QString("%1 set com: %2").arg(handLabel(hand), QString::fromStdString(result.msg)));
-        if (result.success) {
-            done << handLabel(hand);
-        } else {
-            failed << QString("%1: %2").arg(handLabel(hand), QString::fromStdString(result.msg));
-        }
-    }
-
-    if (done.isEmpty() && failed.isEmpty()) {
-        setCtrlResult(false, QStringLiteral("set com: no hands present"));
-        return;
-    }
-    if (failed.isEmpty()) {
-        setCtrlResult(true, QString("set com: ok (%1)").arg(done.join(", ")));
-        return;
-    }
-    setCtrlResult(false, QString("set com: %1").arg(failed.join("; ")));
-}
-
-void HandNodeBoard::onZeroCalibrate()
-{
-    using hand_sdk::service::Hand;
-
-    QStringList done;
-    QStringList failed;
-
-    for (const auto hand : {Hand::kLeft, Hand::kRight}) {
-        if (!source_.present(hand)) {
-            continue;
-        }
-
-        const auto mask = checkedMask(hand);
-        if (!mask.any()) {
-            failed << QString("%1: nothing ticked").arg(handLabel(hand));
-            continue;
-        }
-
-        const auto result = source_.api()->serviceZeroCalibrate(
-            hand, hand_sdk::service::ZeroCalDir::kSameAsEncoder, mask);
-
-        appendLog(QString("%1 zero-cal %2 joints: %3")
-                      .arg(handLabel(hand))
-                      .arg(static_cast<int>(mask.count()))
-                      .arg(QString::fromStdString(result.msg)));
-
-        if (result.success) {
-            done << QString("%1 %2").arg(handLabel(hand)).arg(static_cast<int>(mask.count()));
-        } else {
-            failed << QString("%1: %2").arg(handLabel(hand), QString::fromStdString(result.msg));
-        }
-    }
-
-    // Neither the ticks nor the captions move. The ticks are the selection that
-    // was just written to, and the caption is the *state*, which this call has
-    // only asked to start changing -- the routine runs for seconds past the
-    // service window. Press `calibrate state` to see where it got to.
-    if (done.isEmpty() && failed.isEmpty()) {
-        setCtrlResult(false, QStringLiteral("zero-cal: no hands present"));
-        return;
-    }
-    if (failed.isEmpty()) {
-        setCtrlResult(true, QString("zero-cal: started (%1)").arg(done.join(", ")));
-        return;
-    }
-    setCtrlResult(false, QString("zero-cal: %1").arg(failed.join("; ")));
-}
-
-void HandNodeBoard::onSeedPos()
-{
-    using hand_sdk::service::Hand;
-
-    QStringList done;
-    QStringList failed;
-
-    for (const auto hand : {Hand::kLeft, Hand::kRight}) {
-        if (!source_.present(hand)) {
-            continue;
-        }
-        // Whole hand, not the ticked joints: a command frame carries all
-        // twenty-one slots and there is no "no action" word on the data path,
-        // so there is no such thing as seeding a subset. The ticks belong to
-        // the service writes.
-        if (source_.seedFromState(hand)) {
-            done << handLabel(hand);
-        } else {
-            failed << handLabel(hand);
-        }
-    }
-
-    if (done.isEmpty() && failed.isEmpty()) {
-        setCtrlResult(false, QStringLiteral("seed: no hands present"));
-        return;
-    }
-    if (failed.isEmpty()) {
-        const auto text = QString("seed: hold pose latched (%1)").arg(done.join(", "));
-        setCtrlResult(true, text);
-        appendLog(text);
-        return;
-    }
-    const auto text = QString("seed: FAILED %1%2")
-                          .arg(failed.join(", "),
-                               done.isEmpty() ? QString() : QString(" | ok: %1").arg(done.join(", ")));
-    setCtrlResult(false, text);
-    appendLog(text);
-}
-
-void HandNodeBoard::onReadGains()
-{
-    ui_.render_state_type->setText("gains kp/kd");
-    forEachHand("gains", [this](hand_sdk::service::Hand hand) {
-        const auto result = source_.api()->serviceGainsQuery(hand);
-        if (!result.success) {
-            return QString::fromStdString(result.msg);
-        }
-        renderGains(hand, result.value);
-        return QString();
-    });
-}
-
-void HandNodeBoard::onSetGains()
-{
-    using hand_sdk::service::Hand;
-
-    bool kp_ok = false;
-    bool kd_ok = false;
-    const double kp = ui_.kp_input->text().toDouble(&kp_ok);
-    const double kd = ui_.kd_input->text().toDouble(&kd_ok);
-    if (!kp_ok || !kd_ok) {
-        setCtrlResult(false, QStringLiteral("gains: kp and kd must be numbers"));
-        return;
-    }
-
-    // s16en11 on the wire: at or past +-16 the value saturates at the INT16
-    // rail instead of wrapping, so the device would quietly run a gain nobody
-    // asked for. Refused rather than clamped -- a silently different gain is
-    // worse than a button that did nothing.
-    constexpr double kWireLimit = 16.0;
-    if (std::fabs(kp) >= kWireLimit || std::fabs(kd) >= kWireLimit) {
-        setCtrlResult(false, QString("gains: |kp| and |kd| must be < %1 (s16en11 wire range)")
-                                 .arg(kWireLimit));
-        return;
-    }
-
-    QStringList done;
-    QStringList failed;
-    int written = 0;
-
-    for (const auto hand : {Hand::kLeft, Hand::kRight}) {
-        if (!source_.present(hand)) {
-            continue;
-        }
-
-        const auto mask = checkedMask(hand);
-        if (!mask.any()) {
-            failed << QString("%1: nothing ticked").arg(handLabel(hand));
-            continue;
-        }
-
-        const auto result = source_.api()->serviceGains(
-            hand, static_cast<float>(kp), static_cast<float>(kd), mask);
-        ++written;
-
-        appendLog(QString("%1 gains kp=%2 kd=%3 on %4 joints: %5")
-                      .arg(handLabel(hand))
-                      .arg(kp, 0, 'f', 3)
-                      .arg(kd, 0, 'f', 3)
-                      .arg(static_cast<int>(mask.count()))
-                      .arg(QString::fromStdString(result.msg)));
-
-        if (result.success) {
-            done << QString("%1 %2j").arg(handLabel(hand)).arg(static_cast<int>(mask.count()));
-        } else {
-            failed << QString("%1: %2").arg(handLabel(hand), QString::fromStdString(result.msg));
-        }
-    }
-
-    if (done.isEmpty() && failed.isEmpty()) {
-        setCtrlResult(false, QStringLiteral("gains: no hands present"));
-        return;
-    }
-
-    // Same rule as enable/disable: a masked write only answers for the joints
-    // it addressed, so the grid is refilled from a real read of all twenty.
-    if (written > 0) {
-        onReadGains();
-    }
-
-    if (failed.isEmpty()) {
-        setCtrlResult(true, QString("gains kp=%1 kd=%2: ok (%3)")
-                                .arg(kp, 0, 'f', 3).arg(kd, 0, 'f', 3).arg(done.join(", ")));
-        return;
-    }
-    setCtrlResult(false, QString("gains: %1").arg(failed.join("; ")));
-}
-
-void HandNodeBoard::onCalibrateState()
-{
-    using hand_sdk::service::Hand;
-
-    QStringList parts;
-    bool any = false;
-
-    for (const auto hand : {Hand::kLeft, Hand::kRight}) {
-        if (!source_.present(hand)) {
-            setCheckCaptions(hand, QStringLiteral("-"), QStringLiteral("hand not present"));
-            continue;
-        }
-        any = true;
-
-        // Reads every joint, ticked or not: this is the state of the hand, not
-        // a report on the selection.
-        const auto result = source_.api()->serviceZeroCalibrateState(hand);
-        if (!result.success) {
-            const auto why = QString::fromStdString(result.msg);
-            setCheckCaptions(hand, QStringLiteral("ERR"), why);
-            parts << QString("%1: %2").arg(handLabel(hand), why);
-            appendLog(QString("%1 calib state FAILED: %2").arg(handLabel(hand), why));
-            continue;
-        }
-
-        // Captions only. A tick means "this motor is selected", never "this
-        // motor is calibrated", so a read has no business moving one.
-        auto& boxes = checkBoxes(hand);
-        for (std::size_t i = 0; i < kNumBoardJoints; ++i) {
-            if (boxes[i] == nullptr) {
-                continue;
-            }
-            boxes[i]->setText(zeroCalTag(result.value[i]));
-            boxes[i]->setToolTip(
-                QString::fromUtf8(hand_sdk::service::stateName(result.value[i])));
-        }
-
-        parts << QString("%1: %2").arg(handLabel(hand), QString::fromStdString(result.msg));
-        appendLog(QString("%1 calib state: %2")
-                      .arg(handLabel(hand), QString::fromStdString(result.msg)));
-    }
-
-    if (!any) {
-        setCtrlResult(false, QStringLiteral("calib state: no hands present"));
-        return;
-    }
-    setCtrlResult(true, QString("calib state | %1").arg(parts.join(QStringLiteral(" | "))));
-}
-
-void HandNodeBoard::setCtrlResult(bool ok, const QString& text)
-{
-    if (ctrl_result_ != nullptr) {
-        ctrl_result_->setText(text);
-        ctrl_result_->setStyleSheet(ok ? "color: green;" : "color: red;");
-    }
-    appendLog(text);
+    ui_.label_40->setText(kind);
 }
 
 std::array<QLabel*, kNumBoardJoints>& HandNodeBoard::stateLabels(hand_sdk::service::Hand hand)
@@ -612,86 +694,75 @@ std::array<QLabel*, kNumBoardJoints>& HandNodeBoard::stateLabels(hand_sdk::servi
     return hand == hand_sdk::service::Hand::kLeft ? state_left_ : state_right_;
 }
 
+void HandNodeBoard::setCell(hand_sdk::service::Hand hand, std::size_t joint,
+                            const QString& text, bool bad, const QString& tip)
+{
+    auto* label = stateLabels(hand)[joint];
+    if (label == nullptr) {
+        return;
+    }
+    label->setText(QStringLiteral("%1: %2").arg(static_cast<int>(joint % 4)).arg(text));
+    label->setStyleSheet(bad ? QStringLiteral("color: red;") : QString());
+    label->setToolTip(tip);
+}
+
 void HandNodeBoard::renderMcState(hand_sdk::service::Hand hand,
                                   const hand_sdk::service::McStatusArray& status)
 {
-    auto& labels = stateLabels(hand);
     for (std::size_t i = 0; i < kNumBoardJoints; ++i) {
-        if (labels[i] == nullptr) {
-            continue;
-        }
         const auto& joint = status[i];
         const QString faults = faultNames(joint.fault_code);
         const bool bad = joint.state == hand_sdk::service::McState::kFault || !faults.isEmpty();
-
-        labels[i]->setText(faults.isEmpty()
-                               ? QString(mcStateName(joint.state))
-                               : QString("%1 (%2)").arg(mcStateName(joint.state), faults));
-        labels[i]->setStyleSheet(bad ? "color: red;" : "");
+        setCell(hand, i,
+                faults.isEmpty() ? mcStateName(joint.state)
+                                 : QStringLiteral("%1 (%2)").arg(mcStateName(joint.state), faults),
+                bad);
     }
 }
 
-void HandNodeBoard::renderCtrlState(hand_sdk::service::Hand hand,
-                                    const hand_sdk::service::ModeStatusArray& status)
+void HandNodeBoard::renderCalibState(hand_sdk::service::Hand hand,
+                                     const hand_sdk::service::ZeroCalStateArray& states)
 {
-    auto& labels = stateLabels(hand);
-    QStringList odd_mode;
-
     for (std::size_t i = 0; i < kNumBoardJoints; ++i) {
-        if (labels[i] == nullptr) {
-            continue;
-        }
-        const auto& joint = status[i];
-        // 1 enabled, 0 disabled. Off is not a fault, but it is the thing this
-        // screen exists to spot, so it gets the colour.
-        labels[i]->setText(joint.enabled ? "1" : "0");
-        labels[i]->setStyleSheet(joint.enabled ? "" : "color: red;");
-
-        if (joint.mode == hand_sdk::service::LoopMode::kThreeLoop) {
-            odd_mode << QString::number(i);
-        }
-    }
-
-    // The loop mode is not in the cells any more, so say it here rather than
-    // drop it: everything should be force control unless someone is debugging.
-    if (!odd_mode.isEmpty()) {
-        appendLog(QString("%1: joints %2 are in three-loop mode, not force control")
-                      .arg(handLabel(hand), odd_mode.join(",")));
+        const auto state = states[i];
+        // Anything but "succeeded" is worth spotting: a joint that has not been
+        // zeroed is measuring from an arbitrary boot pose.
+        setCell(hand, i, zeroCalTag(state),
+                state != hand_sdk::service::ZeroCalState::kSucceeded,
+                QString::fromUtf8(hand_sdk::service::stateName(state)));
     }
 }
 
-// The third thing the state grid can be showing. Both numbers in one cell:
-// they are set together and only make sense read together.
 void HandNodeBoard::renderGains(hand_sdk::service::Hand hand,
                                 const hand_sdk::service::JointGainsArray& gains)
 {
-    auto& labels = stateLabels(hand);
     for (std::size_t i = 0; i < kNumBoardJoints; ++i) {
-        if (labels[i] == nullptr) {
-            continue;
-        }
         const auto& joint = gains[i];
-        labels[i]->setText(QString("%1/%2")
-                               .arg(joint.kp, 0, 'f', 2)
-                               .arg(joint.kd, 0, 'f', 2));
-        // A joint running zero gains is enabled but holding nothing -- it looks
-        // like a failed enable and is the thing worth spotting here, so it gets
-        // the colour the other two renders use for "not what you want".
-        labels[i]->setStyleSheet((joint.kp == 0.0f && joint.kd == 0.0f) ? "color: red;" : "");
+        // Both numbers in one cell: they are set together and only make sense
+        // read together. A joint running zero gains is enabled but holding
+        // nothing -- it looks like a failed enable, so it gets the colour.
+        setCell(hand, i,
+                QStringLiteral("%1/%2").arg(joint.kp, 0, 'f', 2).arg(joint.kd, 0, 'f', 2),
+                joint.kp == 0.0f && joint.kd == 0.0f);
     }
 }
 
 void HandNodeBoard::clearStateColumn(hand_sdk::service::Hand hand, const QString& text)
 {
-    for (auto* label : stateLabels(hand)) {
-        if (label != nullptr) {
-            label->setText(text);
-            label->setStyleSheet("");
-        }
+    for (std::size_t i = 0; i < kNumBoardJoints; ++i) {
+        setCell(hand, i, text, false);
     }
 }
 
-// --- readings tab -----------------------------------------------------------
+void HandNodeBoard::clearStateGrid(const QString& text)
+{
+    using hand_sdk::service::Hand;
+    for (const auto hand : {Hand::kLeft, Hand::kRight}) {
+        clearStateColumn(hand, text);
+    }
+}
+
+// --- tab 2: what the node is publishing --------------------------------------
 
 void HandNodeBoard::onRefresh()
 {
@@ -704,34 +775,37 @@ void HandNodeBoard::onRefresh()
 
     for (std::size_t i = 0; i < kNumBoardJoints; ++i) {
         if (!snapshot.valid) {
-            if (pos_labels_[i] != nullptr) pos_labels_[i]->setText("-");
-            if (vel_labels_[i] != nullptr) vel_labels_[i]->setText("-");
-            if (tau_labels_[i] != nullptr) tau_labels_[i]->setText("-");
-            if (err_labels_[i] != nullptr) err_labels_[i]->setText("-");
+            // Nothing has been published for this hand -- the bus is down, or
+            // it is up and not yet cycling. A dash rather than a stale number.
+            if (pos_labels_[i] != nullptr) pos_labels_[i]->setText(QStringLiteral("-"));
+            if (vel_labels_[i] != nullptr) vel_labels_[i]->setText(QStringLiteral("-"));
+            if (tau_labels_[i] != nullptr) tau_labels_[i]->setText(QStringLiteral("-"));
+            if (err_labels_[i] != nullptr) {
+                err_labels_[i]->setText(QStringLiteral("-"));
+                err_labels_[i]->setStyleSheet(QString());
+            }
             continue;
         }
 
         // Degrees on screen, radians on the wire.
         if (pos_labels_[i] != nullptr) {
-            pos_labels_[i]->setText(QString::number(snapshot.q[i] * 180.0 / M_PI, 'f', 1));
+            pos_labels_[i]->setText(
+                QString::number(static_cast<double>(snapshot.q[i]) * kRadToDeg, 'f', 2));
         }
         if (vel_labels_[i] != nullptr) {
-            vel_labels_[i]->setText(QString::number(snapshot.dq[i] * 180.0 / M_PI, 'f', 1));
+            vel_labels_[i]->setText(
+                QString::number(static_cast<double>(snapshot.dq[i]) * kRadToDeg, 'f', 2));
         }
         if (tau_labels_[i] != nullptr) {
-            tau_labels_[i]->setText(QString::number(snapshot.tau[i], 'f', 3));
+            tau_labels_[i]->setText(
+                QString::number(static_cast<double>(snapshot.tau[i]), 'f', 3));
         }
         if (err_labels_[i] != nullptr) {
-            const bool faulted = (snapshot.error_bits >> i) & 1u;
-            err_labels_[i]->setText(faulted ? "1" : "0");
-            err_labels_[i]->setStyleSheet(faulted ? "color: red;" : "");
+            // 1 faulted, 0 healthy -- the same 1/0 hand_sdk_app shows, so an
+            // empty cell always means "not read", never "no fault".
+            const bool faulted = (snapshot.error_bits & (1u << i)) != 0u;
+            err_labels_[i]->setText(faulted ? QStringLiteral("1") : QStringLiteral("0"));
+            err_labels_[i]->setStyleSheet(faulted ? QStringLiteral("color: red;") : QString());
         }
     }
-}
-
-// --- helpers ----------------------------------------------------------------
-
-void HandNodeBoard::appendLog(const QString& text)
-{
-    ui_.log->append(QDateTime::currentDateTime().toString("HH:mm:ss ") + text);
 }

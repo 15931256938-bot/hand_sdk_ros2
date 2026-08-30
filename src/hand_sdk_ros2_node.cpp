@@ -11,14 +11,15 @@
 
 #include <array>
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
+#include <memory>
 #include <mutex>
+#include <sstream>
 #include <string>
-#include <stdexcept>
 #include <thread>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 namespace
@@ -67,17 +68,32 @@ std::vector<double> toDoubleVector(const std::array<float, kNumSdkJoints>& value
     std::vector<double> result;
     result.reserve(kNumRosJoints);
     for (std::size_t i = 0; i < kNumRosJoints; ++i) {
-        const auto value = values[i];
-        result.push_back(static_cast<double>(value));
+        result.push_back(static_cast<double>(values[i]));
     }
     return result;
+}
+
+std::string describeSlave(const hand_sdk::SlaveStatus& status)
+{
+    if (!status.present) {
+        return "absent";
+    }
+    std::ostringstream text;
+    text << status.state_text << " (AL 0x" << std::hex << status.al_state
+         << ", code 0x" << status.al_status_code << std::dec << ")";
+    if (!status.error_text.empty()) {
+        text << " -- " << status.error_text;
+    }
+    return text.str();
 }
 
 using SetGains = hand_sdk_ros2::srv::SetGains;
 
 struct SideState
 {
-    bool present{false};
+    // Read from the publish timer, the service callbacks and the Qt thread;
+    // written by connect/disconnect on the Qt thread.
+    std::atomic<bool> present{false};
     hand_sdk::service::Hand hand{hand_sdk::service::Hand::kLeft};
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr state_pub;
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr command_sub;
@@ -87,6 +103,14 @@ struct SideState
 
 } // namespace
 
+// The ROS half of the hand: joint commands in, joint states out, and nothing
+// else. Everything that is not the data path -- bringing the bus up, opening
+// communication, zero calibration, gains, enabling force control -- is pressed
+// from the board, which is why this constructor no longer touches the hardware.
+//
+// The node therefore starts with no bus at all. Publishers, subscriptions and
+// services are all up from the first instant; they simply have nothing to talk
+// to until somebody presses `connect`, and say so rather than failing silently.
 class HandSdkRos2Node final : public rclcpp::Node, public BoardSource
 {
 public:
@@ -97,31 +121,21 @@ public:
         declare_parameter<std::string>("left_hand_name", "hand_200_L");
         declare_parameter<std::string>("right_hand_name", "hand_200_R");
         declare_parameter<double>("publish_rate_hz", 100.0);
-        // Not applied at bring-up any more -- nothing is enabled unattended, so
-        // there are no gains to set yet. Kept as the default the board's gains
-        // control starts from.
+        // What the board's kp/kd fields start from. Not applied to the device
+        // by anything here: gains are a deliberate write, pressed from the
+        // board or asked for over set_gains.
         declare_parameter<double>("initial_kp", 1.0);
         declare_parameter<double>("initial_kd", 0.005);
-        declare_parameter<double>("bringup_timeout_sec", 5.0);
-        // The diagnostic board comes up with the node. Turn it off for headless
-        // runs -- Qt needs a display and will fail hard without one.
-        declare_parameter<bool>("board", true);
+        // How long seed_pos waits for a state sample to latch. Tenths of a
+        // second: the bus publishes at 1 kHz once it is cycling, so this only
+        // covers a just-started cycle.
+        declare_parameter<double>("seed_timeout_sec", 0.5);
 
-        hand_sdk::Config config;
-        config.interface_name = get_parameter("interface_name").as_string();
-        config.left_hand_name = get_parameter("left_hand_name").as_string();
-        config.right_hand_name = get_parameter("right_hand_name").as_string();
+        config_.interface_name = get_parameter("interface_name").as_string();
+        config_.left_hand_name = get_parameter("left_hand_name").as_string();
+        config_.right_hand_name = get_parameter("right_hand_name").as_string();
 
-        api_ = std::make_unique<hand_sdk::Api>(config);
-
-        const auto connected = api_->connect();
-        if (!connected.success) {
-            throw std::runtime_error("hand_sdk connect failed: " + connected.msg);
-        }
-
-        left_.present = connected.value.has_left;
         left_.hand = hand_sdk::service::Hand::kLeft;
-        right_.present = connected.value.has_right;
         right_.hand = hand_sdk::service::Hand::kRight;
 
         joint_name_index_.reserve(kNumRosJoints);
@@ -168,39 +182,101 @@ public:
             std::chrono::duration<double>(1.0 / publish_rate_hz));
         publish_timer_ = create_wall_timer(period, [this]() { publishStates(); });
 
-        RCLCPP_INFO(get_logger(), "connected: left=%s right=%s dc=%s",
-                    left_.present ? "yes" : "no",
-                    right_.present ? "yes" : "no",
-                    api_->dcActive() ? "armed" : "off");
-
-        if (left_.present) {
-            bringUpSide(left_, "left");
-        }
-        if (right_.present) {
-            bringUpSide(right_, "right");
-        }
-
-        if (!left_.present && !right_.present) {
-            throw std::runtime_error("hand_sdk connect reported no hands present");
-        }
+        RCLCPP_INFO(get_logger(),
+                    "up, bus down. Nothing is published until the board connects.");
     }
 
     ~HandSdkRos2Node() override
     {
-        if (api_) {
-            api_->disconnect();
-        }
+        disconnectBus();
     }
 
-    bool boardEnabled() const { return get_parameter("board").as_bool(); }
+    double initialKp() const { return get_parameter("initial_kp").as_double(); }
+    double initialKd() const { return get_parameter("initial_kd").as_double(); }
 
-    // --- BoardSource: what the diagnostic board reads --------------------
+    // --- BoardSource: the bus, as the board drives it ------------------------
+    //
+    // connectBus(), disconnectBus() and api() run on the Qt thread and are the
+    // only writers of api_. Everything else takes its own handle out of it
+    // under the lock (bus()), so a call already in flight keeps its Api alive
+    // even if the board drops the bus underneath it.
 
-    hand_sdk::Api* api() override { return api_.get(); }
+    Connection connectBus() override
+    {
+        Connection result;
+        if (bus() != nullptr) {
+            result.msg = "already connected";
+            return result;
+        }
+
+        auto api = std::make_shared<hand_sdk::Api>(config_);
+        const auto connected = api->connect();
+        if (!connected.success) {
+            result.msg = connected.msg;
+            RCLCPP_WARN(get_logger(), "connect failed: %s", connected.msg.c_str());
+            return result;
+        }
+
+        left_.present.store(connected.value.has_left);
+        right_.present.store(connected.value.has_right);
+        clearSnapshots();
+
+        {
+            std::lock_guard<std::mutex> lock(api_mutex_);
+            api_ = std::move(api);
+        }
+
+        result.success = true;
+        result.msg = connected.msg;
+        result.has_left = connected.value.has_left;
+        result.has_right = connected.value.has_right;
+        result.dc_active = bus()->dcActive();
+
+        RCLCPP_INFO(get_logger(), "connected: left=%s right=%s dc=%s",
+                    result.has_left ? "yes" : "no",
+                    result.has_right ? "yes" : "no",
+                    result.dc_active ? "armed" : "off");
+        return result;
+    }
+
+    std::string disconnectBus() override
+    {
+        std::shared_ptr<hand_sdk::Api> api;
+        {
+            std::lock_guard<std::mutex> lock(api_mutex_);
+            api.swap(api_);
+        }
+        if (!api) {
+            return "not connected";
+        }
+
+        // Taken before the disconnect, and the slave status after it:
+        // disconnect() re-reads the AL status, so this is the one place either
+        // side of the node can say what state the slaves ended in. A run whose
+        // exchanges were failing ends somewhere other than OP.
+        const auto stats = api->cycleStats();
+        api->disconnect();
+
+        std::ostringstream summary;
+        summary << "bus at disconnect: left " << describeSlave(api->leftStatus())
+                << " | right " << describeSlave(api->rightStatus())
+                << " | cycles " << stats.cycles
+                << " | exchange failures " << stats.exchange_failures
+                << " | phase " << (stats.phase_error_ns / 1000) << " us";
+
+        left_.present.store(false);
+        right_.present.store(false);
+        clearSnapshots();
+
+        RCLCPP_INFO(get_logger(), "%s", summary.str().c_str());
+        return summary.str();
+    }
+
+    hand_sdk::Api* api() override { return bus().get(); }
 
     bool present(hand_sdk::service::Hand hand) const override
     {
-        return sideFor(hand).present;
+        return sideFor(hand).present.load();
     }
 
     BoardSnapshot snapshot(hand_sdk::service::Hand hand) const override
@@ -209,13 +285,13 @@ public:
         return hand == hand_sdk::service::Hand::kLeft ? left_snapshot_ : right_snapshot_;
     }
 
-    // The board's seed_pos button. Runs the same step bring-up does, on the Qt
-    // thread: readState() is safe from anywhere, and the command itself is
-    // written under command_mutex_ like every other writer of it.
+    // The board's seed_pos, and the seeding half of its `set com all`. Runs on
+    // the Qt thread: readState() is safe from anywhere, and the command itself
+    // is written under command_mutex_ like every other writer of it.
     bool seedFromState(hand_sdk::service::Hand hand) override
     {
         auto& side = sideFor(hand);
-        if (!side.present) {
+        if (!side.present.load()) {
             return false;
         }
         const char* label = hand == hand_sdk::service::Hand::kLeft ? "left" : "right";
@@ -223,6 +299,12 @@ public:
     }
 
 private:
+    std::shared_ptr<hand_sdk::Api> bus() const
+    {
+        std::lock_guard<std::mutex> lock(api_mutex_);
+        return api_;
+    }
+
     SideState& sideFor(hand_sdk::service::Hand hand)
     {
         return (hand == hand_sdk::service::Hand::kLeft) ? left_ : right_;
@@ -233,23 +315,33 @@ private:
         return (hand == hand_sdk::service::Hand::kLeft) ? left_ : right_;
     }
 
-    void sendLatestCommand()
+    void clearSnapshots()
     {
-        hand_sdk::frames::DualHandCommand command;
+        std::lock_guard<std::mutex> lock(snapshot_mutex_);
+        left_snapshot_ = BoardSnapshot{};
+        right_snapshot_ = BoardSnapshot{};
+    }
 
+    void sendLatestCommand(const std::shared_ptr<hand_sdk::Api>& api)
+    {
+        if (!api) {
+            return;
+        }
+
+        hand_sdk::frames::DualHandCommand command;
         {
             std::lock_guard<std::mutex> lock(command_mutex_);
-            if (left_.present) {
+            if (left_.present.load()) {
                 command.has_left = true;
                 command.left = left_.command;
             }
-            if (right_.present) {
+            if (right_.present.load()) {
                 command.has_right = true;
                 command.right = right_.command;
             }
         }
 
-        const auto result = api_->sendCommand(command);
+        const auto result = api->sendCommand(command);
         if (!result.success) {
             RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
                                  "sendCommand failed: %s", result.msg.c_str());
@@ -258,13 +350,22 @@ private:
 
     void onJointCommand(hand_sdk::service::Hand hand, const sensor_msgs::msg::JointState& msg)
     {
+        // Latched whether or not the bus is up, so a publisher that starts
+        // before the operator presses connect is not lost: the standing command
+        // is already what it asked for by the time the wire exists.
         {
             std::lock_guard<std::mutex> lock(command_mutex_);
-            auto& command = sideFor(hand).command;
-            updateCommandFromJointState(msg, command);
+            updateCommandFromJointState(msg, sideFor(hand).command);
         }
 
-        sendLatestCommand();
+        const auto api = bus();
+        if (!api) {
+            RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+                                 "joint_command received while the bus is down -- latched, "
+                                 "not sent. Press connect on the board.");
+            return;
+        }
+        sendLatestCommand(api);
     }
 
     void onSetGains(hand_sdk::service::Hand hand,
@@ -272,7 +373,15 @@ private:
                     const SetGains::Request& request,
                     SetGains::Response& response)
     {
-        if (!sideFor(hand).present) {
+        const auto api = bus();
+        if (!api) {
+            response.success = false;
+            response.message = "bus is down -- connect from the board first";
+            RCLCPP_WARN(get_logger(), "%s set_gains: %s", label, response.message.c_str());
+            return;
+        }
+
+        if (!sideFor(hand).present.load()) {
             response.success = false;
             response.message = std::string(label) + " hand is not present";
             RCLCPP_WARN(get_logger(), "%s", response.message.c_str());
@@ -288,7 +397,9 @@ private:
                         label, request.kp, request.kd, kGainWireLimit);
         }
 
-        const auto result = api_->serviceGains(hand, request.kp, request.kd);
+        // Hand-wide, unlike the board's masked write: from ROS the hand is one
+        // unit (see srv/SetGains.srv).
+        const auto result = api->serviceGains(hand, request.kp, request.kd);
         response.success = result.success;
         response.message = result.msg;
 
@@ -311,7 +422,12 @@ private:
 
     void publishStates()
     {
-        const auto state = api_->readState();
+        const auto api = bus();
+        if (!api) {
+            return;   // no bus, nothing to publish, and nothing worth warning about
+        }
+
+        const auto state = api->readState();
         if (!state.success) {
             RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
                                  "readState failed: %s", state.msg.c_str());
@@ -319,11 +435,11 @@ private:
         }
 
         const auto stamp = now();
-        if (left_.present && state.value.has_left) {
+        if (left_.present.load() && state.value.has_left) {
             publishSide(left_.state_pub, stamp, state.value.left);
             cacheSnapshot(left_snapshot_, state.value.left);
         }
-        if (right_.present && state.value.has_right) {
+        if (right_.present.load() && state.value.has_right) {
             publishSide(right_.state_pub, stamp, state.value.right);
             cacheSnapshot(right_snapshot_, state.value.right);
         }
@@ -400,53 +516,26 @@ private:
         }
     }
 
-    bool waitForMcReady(hand_sdk::service::Hand hand, const char* label)
-    {
-        const double timeout_sec = get_parameter("bringup_timeout_sec").as_double();
-        const auto deadline = std::chrono::steady_clock::now() +
-                              std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                                  std::chrono::duration<double>(timeout_sec));
-
-        while (rclcpp::ok() && std::chrono::steady_clock::now() < deadline) {
-            const auto mc = api_->serviceMcState(hand);
-            if (!mc.success) {
-                RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,
-                                     "%s mc-state query failed: %s",
-                                     label, mc.msg.c_str());
-                std::this_thread::sleep_for(100ms);
-                continue;
-            }
-
-            bool ready = true;
-            for (const auto& joint : mc.value) {
-                if (joint.state != hand_sdk::service::McState::kStandby &&
-                    joint.state != hand_sdk::service::McState::kActive) {
-                    ready = false;
-                    break;
-                }
-            }
-
-            if (ready) {
-                RCLCPP_INFO(get_logger(), "%s mc-state ready", label);
-                return true;
-            }
-
-            std::this_thread::sleep_for(100ms);
-        }
-
-        RCLCPP_WARN(get_logger(), "%s mc-state did not reach standby|active before timeout", label);
-        return false;
-    }
-
+    // Latch the pose the hand is measured at as the standing command, and put
+    // it on the wire. The board asks for this after opening communication and
+    // after any zero calibration -- a calibration redefines a joint's origin,
+    // so a pose latched before it refers to an origin the device has dropped.
     bool seedCommandFromState(SideState& side, const char* label)
     {
-        const double timeout_sec = get_parameter("bringup_timeout_sec").as_double();
+        const auto api = bus();
+        if (!api) {
+            return false;
+        }
+
+        const double timeout_sec = get_parameter("seed_timeout_sec").as_double();
         const auto deadline = std::chrono::steady_clock::now() +
                               std::chrono::duration_cast<std::chrono::steady_clock::duration>(
                                   std::chrono::duration<double>(timeout_sec));
 
+        // The bus has been cycling since connect, so the first read normally
+        // succeeds; the retries only cover a torn read or a just-started cycle.
         while (rclcpp::ok() && std::chrono::steady_clock::now() < deadline) {
-            const auto state = api_->readState();
+            const auto state = api->readState();
             const bool is_left = side.hand == hand_sdk::service::Hand::kLeft;
             const bool has_side = state.success &&
                                   (is_left ? state.value.has_left : state.value.has_right);
@@ -459,57 +548,25 @@ private:
                     side.command.dq.fill(0.0f);
                     side.command.tau.fill(0.0f);
                 }
-                sendLatestCommand();
+                sendLatestCommand(api);
                 RCLCPP_INFO(get_logger(), "%s hold pose seeded from measured state", label);
                 return true;
             }
 
-            std::this_thread::sleep_for(10ms);
+            std::this_thread::sleep_for(5ms);
         }
 
         RCLCPP_WARN(get_logger(), "%s no state to seed the hold pose from", label);
         return false;
     }
 
-    // Bring-up stops short of enabling anything.
-    //
-    // The device zeroes itself wherever it happens to be at power-up, so until
-    // a joint has been zero-calibrated its q is measured from an arbitrary boot
-    // pose. Enabling force control before that would hold the joint against a
-    // pose in a frame the calibration is about to replace. Zero calibration is
-    // a deliberate, per-joint operation -- it drives the motor looking for its
-    // stop -- so it is not something a node constructor should be starting on
-    // its own either.
-    //
-    // What is left is everything that is safe unattended: get the motors
-    // talking, and latch the pose they are already in so that whoever enables
-    // control has something sane standing. Force control and gains are pressed
-    // from the board once the joints are calibrated (`zero_calibrate` ->
-    // `seed current pos` -> enable), which is also why `set com all` is still
-    // there: if this fails, that is the retry.
-    bool bringUpSide(SideState& side, const char* label)
-    {
-        using hand_sdk::service::ComCmd;
+    hand_sdk::Config config_{};
 
-        waitForMcReady(side.hand, label);
+    // Written only by connectBus()/disconnectBus() on the Qt thread; every
+    // other thread copies the handle out under the lock before using it.
+    mutable std::mutex api_mutex_;
+    std::shared_ptr<hand_sdk::Api> api_;
 
-        const auto comm = api_->serviceComm(side.hand, ComCmd::kStartBroadcast);
-        if (!comm.success) {
-            RCLCPP_WARN(get_logger(), "%s start broadcast failed: %s", label, comm.msg.c_str());
-            return false;
-        }
-
-        if (!seedCommandFromState(side, label)) {
-            return false;
-        }
-
-        RCLCPP_INFO(get_logger(),
-                    "%s ready: broadcasting and holding its measured pose. Not enabled -- "
-                    "zero-calibrate, re-seed, then enable control from the board.", label);
-        return true;
-    }
-
-    std::unique_ptr<hand_sdk::Api> api_;
     SideState left_;
     SideState right_;
     rclcpp::CallbackGroup::SharedPtr service_group_;
@@ -536,18 +593,14 @@ int main(int argc, char** argv)
         rclcpp::executors::MultiThreadedExecutor executor;
         executor.add_node(node);
 
-        if (!node->boardEnabled()) {
-            executor.spin();
-            rclcpp::shutdown();
-            return 0;
-        }
-
         // Qt owns the main thread -- it is the only thread it will build
-        // widgets on -- so ROS spins beside it. Closing the window ends the
-        // node; Ctrl-C ends both, since the executor thread drops out of spin()
-        // on shutdown and quits the Qt loop.
+        // widgets on -- so ROS spins beside it. The board comes up every run,
+        // whatever the hardware is doing, because it is the only way to open
+        // the bus. Closing the window ends the node; Ctrl-C ends both, since
+        // the executor thread drops out of spin() on shutdown and quits the Qt
+        // loop.
         QApplication app(argc, argv);
-        HandNodeBoard board(*node);
+        HandNodeBoard board(*node, node->initialKp(), node->initialKd());
         board.show();
 
         std::thread ros_thread([&executor, &app]() {

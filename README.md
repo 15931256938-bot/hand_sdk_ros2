@@ -6,7 +6,7 @@ the other, never both.
 
 | Binary | What it is | ROS at runtime |
 |---|---|---|
-| [`hand_sdk_ros2_node`](#hand_sdk_ros2_node--the-ros-2-node) | ROS 2 node: publishes joint states, takes joint/gain commands, carries a diagnostic board | **yes** — links rclcpp |
+| [`hand_sdk_ros2_node`](#hand_sdk_ros2_node--the-ros-2-node) | ROS 2 node: publishes joint states, takes joint commands, carries the control panel the bus is opened from | **yes** — links rclcpp |
 | [`hand_sdk_app`](#hand_sdk_app--the-standalone-qt-gui) | Qt5 GUI: step-by-step bring-up, live readings, manual pose commands | **no** — links only Qt5 and the SDK |
 
 The app is ROS-free by construction: no source file in it includes rclcpp, and
@@ -91,33 +91,44 @@ sudo ip link set enp132s0 up
 ```bash
 cd ~/Documents/ros2_dev_ws
 source install/setup.bash
-ros2 run hand_sdk_ros2 hand_sdk_ros2_node                              # board comes up
-ros2 run hand_sdk_ros2 hand_sdk_ros2_node --ros-args -p board:=false   # headless
+ros2 run hand_sdk_ros2 hand_sdk_ros2_node
 ```
 
-Bring-up runs inside the node's constructor and stops short of enabling
-anything: mc-state wait, start broadcast, seed the hold pose from the measured
-state. Those lines go to the **ROS console only**; the board's log pane starts
-afterwards and shows only what you do from the board.
+**The node starts with no bus at all.** Nothing is opened in the constructor —
+no connect, no mc-state wait, no broadcast, no seeding — so the board comes up
+every run whatever the hardware is doing, and unplugged cabling is something you
+read in the log rather than a process that died before you saw its window.
+Publishers, subscriptions and services are up from the first instant; they
+simply have nothing to talk to until you press `connect`, and say so:
+`joint_command` is latched but not sent, `set_gains` answers
+`bus is down -- connect from the board first`, `joint_states` stays quiet.
 
-**The node comes up broadcasting and holding, not enabled.** The device zeroes
-itself wherever it happens to be at power-up, so until a joint has been
-zero-calibrated its `q` is measured from an arbitrary boot pose — enabling force
-control before that would hold the joint against a pose in a frame the
-calibration is about to replace. Zero calibration drives the motor looking for
-its stop, so it is not something a node constructor should start on its own
-either. The rest is pressed from the board, in this order:
+The node itself does one thing — **joint_command in, joint_states out**.
+Everything else about the hand is pressed from the board, in this order:
 
 ```
-zero_calibrate -> calibrate_state (until 2 ok) -> seed current pos -> set gains -> ctrl_cmd_enable
+connect -> mc_state -> zero_calibrate -> calibrate_state (until 2 ok)
+        -> set com all -> setGains -> enable ctrl
 ```
 
-`set com all` is the retry for the one step bring-up does take, if it failed.
+`seed current pos` is the seeding half of `set com all` on its own; press it
+again after any calibration and before enabling.
+
+Bring-up stops short of enabling anything, and does so by hand rather than by
+timer. The device zeroes itself wherever it happens to be at power-up, so until
+a joint has been zero-calibrated its `q` is measured from an arbitrary boot pose
+— enabling force control before that would hold the joint against a pose in a
+frame the calibration is about to replace. Zero calibration drives the motor
+looking for its stop, so it is not something a node should start on its own
+either.
 
 Parameters: `interface_name`, `left_hand_name`, `right_hand_name`,
-`publish_rate_hz` (100), `initial_kp` / `initial_kd` (3.0 — no longer applied at
-bring-up; the default the board's gains control starts from),
-`bringup_timeout_sec` (5.0), `board` (true).
+`publish_rate_hz` (100), `initial_kp` / `initial_kd` (1.0 / 0.005 — what the
+board's kp/kd fields start from; nothing applies them to the device on its own),
+`seed_timeout_sec` (0.5).
+
+The board is not optional: it is the only way to open the bus, so a node without
+it would publish nothing. Qt needs a display.
 
 Which motors are fitted backwards is **not** a parameter: it is the
 `kLeftJointDirection` / `kRightJointDirection` table in the SDK's `config.hpp`.
@@ -134,73 +145,90 @@ the node; Ctrl-C stops both.
 | in | `/<side>/joint_command` | `sensor_msgs/JointState` — q, dq, tau_ff; written to the bus on arrival |
 | in | `/<side>/set_gains` | `hand_sdk_ros2/SetGains` — force-mode position loop kp/kd |
 
-`<side>` is `left` or `right`.
+`<side>` is `left` or `right`. The four topics are the whole ROS surface of the
+hand — `hand_control_lib`'s `sdk` backend talks to exactly these.
 
 ```bash
 ros2 service call /left/set_gains hand_sdk_ros2/srv/SetGains "{kp: 3.0, kd: 0.5}"
 ```
 
-Gains apply to the whole hand, and the response carries the device's per-joint
-readback. `success` is the SDK's two-step verdict, not just "the message went
-out": it is false unless every joint came back running the requested gains, and
-`message` then names the joints that did not and what they returned instead. A
-call that reports false is worth reading rather than retrying blind.
+`set_gains` is the one service. `hand_control_lib` currently has it switched off
+— its `connection.gains_service` is `""`, so `activate()` leaves the device on
+whatever gains were last latched — but its `sdk` backend preset still names
+`/{side}/set_gains`, and putting that key back to `null` re-enables the hop with
+no node change. It applies to the **whole hand** — from ROS the hand is one unit
+— and the response carries the device's per-joint readback. `success` is the SDK's
+two-step verdict, not just "the message went out": it is false unless every
+joint came back running the requested gains, and `message` then names the joints
+that did not and what they returned instead. A call that reports false is worth
+reading rather than retrying blind.
 
-Control mode and per-joint gains are **not** on ROS: from ROS the hand is one
-unit, and enabling it is a deliberate act that has to follow zero calibration.
-Both are reachable from C++ — `Api::serviceMode()` and `Api::serviceGains()`
-take a `service::JointMask` (default: every joint) — and from the board below,
-which is where you go to enable the hand in the first place, or to disable one
-motor.
+Control mode and per-joint gains are **not** on ROS: enabling the hand is a
+deliberate act that has to follow zero calibration. Both are reachable from C++
+— `Api::serviceMode()` and `Api::serviceGains()` take a `service::JointMask`
+(default: every joint) — and from the board below, which is where you go to
+enable the hand in the first place, or to retune one motor.
 
 ## The board
 
-The node brings up a diagnostic window with it. It is not a second front end for
-driving the hand: it is there to see what is being published and to take a
-faulted motor out of control.
+The node brings up a control panel with it, modelled on `hand_sdk_app` and
+doing the same job for the same hardware: it is where the bus is opened and the
+hand is brought up, and the second tab shows what the node is publishing while
+that happens.
 
 **states tab** — two 5×4 grids per hand. The upper one is text, and shows
-whichever of the three kinds of state you last asked for — mc-state, control
-state, or gains (`render_state_type` says which). The
+whichever of the three reads you asked for last — mc-state, zero-calibration
+state, or gains. `label_40`, the caption in the grid's corner, says which. The
 lower one is checkboxes: **which motors the next write is aimed at.**
 
 | Button | Sends | Shows |
 |---|---|---|
-| `button_mc_state` | cmd 12, read-only | text grid: `standby` / `active` / `FAULT`, with decoded fault bits, red if faulted |
-| `button_ctrl_state` | cmd 11 with the ignore word in every slot — asks without writing | text grid: `1` enabled / `0` disabled, red when 0 |
+| `connect` | opens the EtherCAT bus, or drops it again | log line: `left=/right=/dc=`; the button becomes `disconnect` |
+| `mc_state` | cmd 12, read-only | text grid: `standby` / `active` / `FAULT`, with decoded fault bits, red if faulted |
+| `calibrate state` | cmd 10 read, **every joint** | text grid: `0 none` / `1 busy` / `2 ok` / `-1 FAIL`, red unless `2 ok` |
 | `read_gains` | cmd 14 read, every joint | text grid: `kp/kd` per joint, red when both are zero |
-| `ctrl_cmd_enable` / `ctrl_cmd_disable` | cmd 11 to **every ticked joint**, then a fresh `ctrl_state` read | text grid refilled from the read; verdict in `ctrl_cmd_result` |
-| `set_com_all_button` | cmd 4 start-broadcast, both hands | verdict only — cmd 4 has no mask, so the ticks play no part |
-| `zero_calibrate` | cmd 10 write to **every ticked joint** | verdict only — nothing in either grid moves |
-| `calibrate_state` | cmd 10 read, **every joint** | checkbox *captions*: `0 none` / `1 busy` / `2 ok` / `-1 FAIL` |
-| `setGains` | cmd 14 write to **every ticked joint** from `kp_input` / `kd_input`, then a fresh `read_gains` | text grid refilled from the read; verdict in `ctrl_cmd_result` |
-| `seed current pos` | nothing on the service channel — re-latches the standing command from the measured pose | verdict only |
-| `selectAll` / `clearAll` | nothing | ticks all / no boxes; captions untouched |
+| `set com all` | cmd 4 start-broadcast on both hands, then seeds the hold pose | verdict — cmd 4 has no mask, so the ticks play no part |
+| `seed current pos` | nothing on the service channel — re-latches the standing command from the measured pose | verdict |
+| `enable ctrl` / `disable ctrl` | cmd 11 to **every active joint**, force-control mode | verdict in `ctrl_cmd_result`; the grid is left alone |
+| `zero calibrate` | cmd 10 write to **every ticked joint** | verdict — nothing in either grid moves |
+| `setGains` | cmd 14 write to **every ticked joint** from `kp_input` / `kd_input`, then a fresh `read_gains` | text grid refilled from the read |
+| `selectAll` / `clearAll` | nothing | ticks all / no boxes |
 
-The loop mode is not in the cells — everything is force control unless someone
-is debugging — so a joint reporting three-loop is called out in the log instead.
+Every button but `connect` refuses with `rejected: not connected` until the bus
+is up with a hand on it. There is one result label, `ctrl_cmd_result`: a word
+and a colour, with the full sentence in the log pane and in its tooltip.
+`OK` / `PARTIAL` / `FAILED` mean what they mean in `hand_sdk_app` — one hand of
+two, or some motors of twenty, is `PARTIAL`, which is a state worth carrying on
+from rather than a failure.
 
 ### Ticks are a selection, never a readout
 
-Nothing the device says ever moves a tick. Only a click, `selectAll`, or
-`clearAll` does. That is what makes the boxes safe to fire a write against: what
-is ticked is exactly what somebody chose, not something a read left behind.
+Nothing the device says ever moves a tick, and clicking one puts nothing on the
+wire — unlike `hand_sdk_app`, where a tick *starts* that joint's calibration.
+Only a click, `selectAll` or `clearAll` moves a box here. That is what makes
+them safe to fire a write against: what is ticked is exactly what somebody
+chose, not something a read left behind.
 
-The captions are the other half of each box and move independently —
-`calibrate_state` fills all forty from cmd 10, and `selectAll` / `clearAll`
-leave them alone. So a box reading `2 ok` **unticked** is the normal resting
-state of a calibrated joint you are not currently writing to.
+Two buttons read them, and only two: `zero calibrate` and `setGains`. Both are
+per-motor operations you want to do to one joint at a time on a bench.
 
-`zero_calibrate` touches neither. It only asks the routine to *start*, and that
-routine runs for seconds past the 10 ms service window — press `calibrate_state`
-to see where it got to.
+`enable ctrl` / `disable ctrl` do **not**: they go to every active joint, the
+way the app's `set ctrl` does. Turning the hand on is not a per-motor operation,
+and a masked cmd 11 has a trap in its reply (below) that an all-joints write
+does not.
+
+`zero calibrate` moves nothing on screen either. It only asks the routine to
+*start*, and that routine runs for seconds past the 10 ms service window — press
+`calibrate state` to see where it got to.
 
 ### seed_pos
 
 Re-latches the standing command from the pose the hand is measured at, so
 force control holds where the joint currently is rather than wherever the
 command holder was last left. It stands until something else writes a command —
-a `joint_command` message, or another press of this.
+a `joint_command` message, or another press of this. `set com all` does it too,
+straight after the broadcast, so the hold pose is always in place before there
+is any chance to enable.
 
 It goes through the node (`BoardSource::seedFromState`) rather than calling
 `sendCommand()` from the board. The node re-sends its own command holder on
@@ -211,7 +239,7 @@ Whole hand, not the ticked joints: a command frame carries all twenty-one slots
 and the data path has no "no action" word, so there is no such thing as seeding
 a subset. The ticks belong to the service writes.
 
-Worth pressing after a `zero_calibrate` finishes: calibration redefines that
+Worth pressing after a `zero calibrate` finishes: calibration redefines that
 joint's origin, so a command latched beforehand refers to an origin the device
 has since dropped.
 
@@ -222,25 +250,24 @@ has since dropped.
 a failed enable until you read the gains and see why.
 
 `setGains` writes `kp_input` / `kd_input` to **the ticked joints only**, then
-re-reads all twenty for the grid (same reason as enable/disable, below). Both
-values are s16en11 on the wire, so `|kp|` and `|kd|` must be under 16 — past
-that the value saturates at the INT16 rail instead of wrapping, and the device
-would quietly run a gain nobody asked for. Out-of-range input is refused rather
-than clamped.
+re-reads all twenty for the grid (same reason as below). Both values are s16en11
+on the wire, so `|kp|` and `|kd|` must be under 16 — past that the value
+saturates at the INT16 rail instead of wrapping, and the device would quietly
+run a gain nobody asked for. Out-of-range input is refused rather than clamped.
 
-Gains want setting **before** `ctrl_cmd_enable`, not after: a joint that comes up
-on the device's power-on defaults may be holding with whatever those are.
+Gains want setting **before** `enable ctrl`, not after: a joint that comes up on
+the device's power-on defaults may be holding with whatever those are.
 
 ### Reading back a masked write
 
-Enable/disable addresses only the ticked motors; the rest carry the ignore word
+A masked write addresses only the ticked motors; the rest carry the ignore word
 and keep running untouched. **The reply to a masked write can only be trusted
-for the joints it addressed.** The SDK already judges it that way — `checkJoints`
-verifies the request's mask and nothing else, so `.msg` reads `mode: 4/4 joints
-took it` for four ticked joints, not `4/20`.
+for the joints it addressed.** The SDK already judges it that way —
+`checkJoints` verifies the request's mask and nothing else, so `.msg` reads
+`4/4 joints took it` for four ticked joints, not `4/20`.
 
-Reading the *other* slots out of that reply is the trap. A device that echoes the
-ignore word back for a slot it was told to skip sends `0xFFFF`, and cmd 11
+Reading the *other* slots out of that reply is the trap. A device that echoes
+the ignore word back for a slot it was told to skip sends `0xFFFF`, and cmd 11
 decodes that as:
 
 ```
@@ -249,16 +276,16 @@ unaddressed j1 : mode=0xFF enabled=1   <-- decoded from 0xFFFF
 ```
 
 — an untouched joint reading as **enabled**, because bit 8 of `0xFFFF` is set.
-So the board does not paint the grid from the write at all: after the write it
-runs a real `ctrl_state` query (cmd 11, all-ignore, which asks about every joint
+So `setGains` does not paint the grid from its own write: after the write it
+runs a real `read_gains` query (cmd 14, all-ignore, which asks about every joint
 properly) and fills all twenty cells from that. Two ~10 ms windows instead of
 one, and no slot on screen is a guess.
 
 Short version, for your own code: **judge the joints you addressed, read the
 whole hand with a query.**
 
-Each call is a ~10 ms bus window on the GUI thread, and it fails cleanly if a ROS
-`set_gains` happens to own the service channel at that moment.
+Each call is a ~10 ms bus window on the GUI thread, and it fails cleanly if a
+ROS `set_gains` happens to own the service channel at that moment.
 
 > **Safety**: disabling a motor drops it to standby — it stops holding and that
 > finger goes limp. Re-enabling picks up whatever the command holder last had,
@@ -266,10 +293,12 @@ Each call is a ~10 ms bus window on the GUI thread, and it fails cleanly if a RO
 
 **readings tab** — the same samples the node publishes, so the screen and
 `joint_states` never disagree. Positions and velocities in **degrees** (the wire
-is radians), torque in N·m, and `error0-19` as 1/0 per motor. The node publishes
-at 100 Hz; the board *samples* the newest cached snapshot at 10 Hz, which is a
-reading rate rather than a control rate. Nothing queues, so it cannot fall
-behind — but a fault bit that sets and clears inside 100 ms is never drawn.
+is radians), torque in N·m, and `error0-19` as 1/0 per motor. A dash means
+nothing has been published for that hand yet — the bus is down, or up and not
+yet cycling. The node publishes at 100 Hz; the board *samples* the newest cached
+snapshot at 10 Hz, which is a reading rate rather than a control rate. Nothing
+queues, so it cannot fall behind — but a fault bit that sets and clears inside
+100 ms is never drawn.
 
 Those error bits come from `HandState::error_bits`, which rides in every
 `readState()` and has nowhere to go in a `JointState` — the board is currently
@@ -481,7 +510,7 @@ it, and it is safe if triggered twice.
 | File | Belongs to | Contents |
 |---|---|---|
 | `src/hand_sdk_ros2_node.cpp` | node | the ROS 2 node, and its `main()` |
-| `src/hand_sdk_node_board.hpp/.cpp` | node | the node's diagnostic board |
+| `src/hand_sdk_node_board.hpp/.cpp` | node | the node's control panel: the bus, bring-up, and what is being published |
 | `src/hand_sdk_node_board_ui.cpp` | node | uic output for the board; `#include`d, not compiled separately |
 | `src/hand_sdk_app.hpp` | app | `HandAppWindow` declaration, grouped by tab |
 | `src/hand_sdk_app.cpp` | app | definitions plus `main()` |
