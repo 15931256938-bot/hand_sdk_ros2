@@ -67,19 +67,40 @@ Check with `getcap <binary>`.
 
 ## 3. Bring the EtherCAT NIC up
 
-The SDK's default `interface_name` is `enp132s0`. Confirm it exists and is up:
+The SDK's default `interface_name` is `enp133s0f1`. Confirm it exists and is up:
 
 ```bash
-ip -br link                          # look for enp132s0
-sudo ip link set enp132s0 up
+ip -br link                          # look for enp133s0f1
+sudo ip link set enp133s0f1 up
 ```
+
+The port is NetworkManager-unmanaged, so nothing brings it up automatically and
+it comes back `DOWN` after every reboot. Wait for the carrier before scanning —
+100BASE-TX autonegotiation takes a couple of seconds, and a scan started too
+early finds no slaves on a link that is about to be perfectly fine:
+
+```bash
+sudo ip link set enp133s0f1 up
+until [ "$(cat /sys/class/net/enp133s0f1/carrier)" = 1 ]; do sleep 1; done
+```
+
+Leaving the port managed is worse than leaving it down: NetworkManager retries
+DHCP on it every 45 s, and each `prepare → config → ip-config → failed` cycle
+reconfigures the device underneath SOEM, so scans fail intermittently rather
+than consistently.
+
+Full NIC guide, including why the Intel X550 replaced the Realtek port and what
+every relevant `ethtool` setting does:
+[hand_sdk_cpp/network.md](../hand_sdk_cpp/network.md) (Chinese). Read-only bus
+probes live in [hand_sdk_cpp/tools/](../hand_sdk_cpp/tools/).
 
 ## If connecting fails
 
 | Message | Cause |
 |---|---|
-| `ecx_init failed: could not open interface` | missing `cap_net_raw`, or `enp132s0` is down |
+| `ecx_init failed: could not open interface` | missing `cap_net_raw`, or `enp133s0f1` is down |
 | no hands reported | hand unpowered, or cabled to a different NIC |
+| scan works sometimes, fails others | NIC still NetworkManager-managed — add it to `99-ethercat-unmanaged.conf` |
 | `could not load the Qt platform plugin "xcb"` | conda's Qt shadowing the system Qt5 — run from a shell with conda deactivated |
 
 ---
@@ -518,5 +539,5 @@ it, and it is safe if triggered twice.
 | `srv/SetGains.srv` | node | the one ROS service type this package generates |
 
 Known limitations: the app uses `hand_sdk::Config{}` defaults (interface
-`enp132s0`) with no way to change them from the UI, and both readings grids show
+`enp133s0f1`) with no way to change them from the UI, and both readings grids show
 the left hand when present, since neither UI has a hand selector.

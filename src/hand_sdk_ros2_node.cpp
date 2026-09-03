@@ -117,7 +117,7 @@ public:
     HandSdkRos2Node()
         : rclcpp::Node("hand_sdk_ros2")
     {
-        declare_parameter<std::string>("interface_name", "enp132s0");
+        declare_parameter<std::string>("interface_name", "enp133s0f1");
         declare_parameter<std::string>("left_hand_name", "hand_200_L");
         declare_parameter<std::string>("right_hand_name", "hand_200_R");
         declare_parameter<double>("publish_rate_hz", 100.0);
