@@ -31,6 +31,19 @@ constexpr double kDegToRad = M_PI / 180.0;
 constexpr float kCommandVelocity = 0.0f;   // rad/s
 constexpr float kCommandTorqueFf = 0.0f;   // N*m
 
+// The left hand is the right hand mirrored: every finger's abduction joint
+// (joint0) points the other way, so those five joints change sign when their
+// values cross between the device and the screen. The fifteen flexion joints
+// are identical on both hands and ride through untouched. Same table as the
+// ROS node.
+constexpr std::array<std::size_t, 5> kMirroredJoints = {0, 4, 8, 12, 16};
+
+bool isMirroredJoint(const std::size_t index)
+{
+    return std::find(kMirroredJoints.begin(), kMirroredJoints.end(), index) !=
+           kMirroredJoints.end();
+}
+
 // How close a gain readback has to be to count as set lives in
 // hand_sdk::Config::service_tolerance -- the SDK judges by it, so this screen
 // does too.
@@ -371,6 +384,10 @@ void HandAppWindow::onConnect()
     // plain pass whenever the bus answered at all.
     setResult(ui_.result_connect, Verdict::kPass, summary);
     appendLog(QStringLiteral("connected: %1").arg(summary));
+    if (hands_.has_left) {
+        appendLog(QStringLiteral("left hand present: finger0..4_joint0 flipped in sign at the "
+                                 "screen boundary (mirrored hand)"));
+    }
     poll_timer_->start();
 }
 
@@ -492,12 +509,15 @@ std::vector<hand_sdk::service::Hand> HandAppWindow::seedCommandFromState(
 
     // Mirror the latched pose into the command fields, so the first "send
     // fields" of a tuning session continues from the hold pose rather than
-    // jumping to whatever was left in the boxes.
+    // jumping to whatever was left in the boxes. The seed above stays in
+    // device convention; only this copy crosses to the screen, so only it is
+    // flipped for the left hand.
     const auto& shown = command.has_left ? command.left : command.right;
     for (std::size_t i = 0; i < kNumUiJoints; ++i) {
         if (cmd_fields_[i] != nullptr) {
+            const double sign = (command.has_left && isMirroredJoint(i)) ? -1.0 : 1.0;
             cmd_fields_[i]->setText(
-                QString::number(static_cast<double>(shown.q[i]) * kRadToDeg, 'f', 2));
+                QString::number(sign * static_cast<double>(shown.q[i]) * kRadToDeg, 'f', 2));
         }
     }
 
@@ -820,17 +840,20 @@ void HandAppWindow::onPoll()
 
     const auto& hand_state = use_left ? state.value.left : state.value.right;
     for (std::size_t i = 0; i < kNumUiJoints; ++i) {
+        // Device -> screen: the left hand's mirrored joints are shown with the
+        // sign the command fields use, so a read-back matches what was typed.
+        const double sign = (use_left && isMirroredJoint(i)) ? -1.0 : 1.0;
         if (pos_labels_[i] != nullptr) {
             pos_labels_[i]->setText(
-                QString::number(static_cast<double>(hand_state.q[i]) * kRadToDeg, 'f', 2));
+                QString::number(sign * static_cast<double>(hand_state.q[i]) * kRadToDeg, 'f', 2));
         }
         if (vel_labels_[i] != nullptr) {
             vel_labels_[i]->setText(
-                QString::number(static_cast<double>(hand_state.dq[i]) * kRadToDeg, 'f', 2));
+                QString::number(sign * static_cast<double>(hand_state.dq[i]) * kRadToDeg, 'f', 2));
         }
         if (tau_labels_[i] != nullptr) {
             tau_labels_[i]->setText(
-                QString::number(static_cast<double>(hand_state.tau[i]), 'f', 3));
+                QString::number(sign * static_cast<double>(hand_state.tau[i]), 'f', 3));
         }
         if (err_labels_[i] != nullptr) {
             // 1 faulted, 0 healthy -- the same 1/0 the node's board shows, so
@@ -871,8 +894,15 @@ void HandAppWindow::sendPositions(const std::array<float, kNumUiJoints>& positio
     }
 
     if (hands_.has_left) {
+        // Screen -> device: the fields hold screen-convention values, so the
+        // left hand's mirrored joints are flipped back before they go out.
         command.has_left = true;
         command.left = hand_command;
+        for (const std::size_t i : kMirroredJoints) {
+            command.left.q[i] = -command.left.q[i];
+            command.left.dq[i] = -command.left.dq[i];
+            command.left.tau[i] = -command.left.tau[i];
+        }
     }
     if (hands_.has_right) {
         command.has_right = true;

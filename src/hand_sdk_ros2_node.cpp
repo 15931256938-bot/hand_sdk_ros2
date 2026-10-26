@@ -58,6 +58,18 @@ const std::array<std::string, kNumRosJoints> kJointNames = {
     "finger4_joint3",
 };
 
+// The left hand is the right hand mirrored: every finger's abduction joint
+// (joint0) points the other way, so those five joints change sign when their
+// values cross between the device and the URDF convention. The fifteen
+// flexion joints are identical on both hands and ride through untouched.
+constexpr std::array<std::size_t, 5> kMirroredJoints = {0, 4, 8, 12, 16};
+
+bool isMirroredJoint(const std::size_t index)
+{
+    return std::find(kMirroredJoints.begin(), kMirroredJoints.end(), index) !=
+           kMirroredJoints.end();
+}
+
 std::vector<std::string> toVector(const std::array<std::string, kNumRosJoints>& names)
 {
     return std::vector<std::string>(names.begin(), names.end());
@@ -236,6 +248,11 @@ public:
                     result.has_left ? "yes" : "no",
                     result.has_right ? "yes" : "no",
                     result.dc_active ? "armed" : "off");
+        if (result.has_left) {
+            RCLCPP_INFO(get_logger(),
+                        "left hand present: finger0..4_joint0 flipped in sign at the ROS "
+                        "boundary (mirrored hand, matches the left-hand URDF)");
+        }
         return result;
     }
 
@@ -355,7 +372,8 @@ private:
         // is already what it asked for by the time the wire exists.
         {
             std::lock_guard<std::mutex> lock(command_mutex_);
-            updateCommandFromJointState(msg, sideFor(hand).command);
+            updateCommandFromJointState(msg, sideFor(hand).command,
+                                        hand == hand_sdk::service::Hand::kLeft);
         }
 
         const auto api = bus();
@@ -436,8 +454,13 @@ private:
 
         const auto stamp = now();
         if (left_.present.load() && state.value.has_left) {
-            publishSide(left_.state_pub, stamp, state.value.left);
-            cacheSnapshot(left_snapshot_, state.value.left);
+            // The copy is deliberate: the left hand is mirrored, and everything
+            // downstream of this line -- subscribers and the board snapshot --
+            // must see URDF-convention values, not the device's raw ones.
+            hand_sdk::frames::HandState left_state = state.value.left;
+            mirrorLeftHand(left_state);
+            publishSide(left_.state_pub, stamp, left_state);
+            cacheSnapshot(left_snapshot_, left_state);
         }
         if (right_.present.load() && state.value.has_right) {
             publishSide(right_.state_pub, stamp, state.value.right);
@@ -463,6 +486,17 @@ private:
         target = fresh;
     }
 
+    // Device -> ROS for the left hand: flip the five mirrored abduction
+    // joints into the URDF convention.
+    static void mirrorLeftHand(hand_sdk::frames::HandState& state)
+    {
+        for (const std::size_t i : kMirroredJoints) {
+            state.q[i] = -state.q[i];
+            state.dq[i] = -state.dq[i];
+            state.tau[i] = -state.tau[i];
+        }
+    }
+
     void publishSide(const rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr& publisher,
                      const rclcpp::Time& stamp,
                      const hand_sdk::frames::HandState& state)
@@ -476,15 +510,21 @@ private:
         publisher->publish(msg);
     }
 
+    // ROS -> device. For the left hand (mirror == true) the five abduction
+    // joints are flipped back into the device convention as they are copied;
+    // the command frame itself always stays in device convention. The named
+    // path flips only the joints the message actually carries, so a partial
+    // message never re-flips a latched value it did not touch.
     void updateCommandFromJointState(const sensor_msgs::msg::JointState& msg,
-                                     hand_sdk::frames::HandCommand& command)
+                                     hand_sdk::frames::HandCommand& command,
+                                     const bool mirror)
     {
         const bool direct_order = msg.name.empty() || msg.name.size() == kNumRosJoints;
 
         if (direct_order) {
-            copyByIndex(msg.position, command.q);
-            copyByIndex(msg.velocity, command.dq);
-            copyByIndex(msg.effort, command.tau);
+            copyByIndex(msg.position, command.q, mirror);
+            copyByIndex(msg.velocity, command.dq, mirror);
+            copyByIndex(msg.effort, command.tau, mirror);
             return;
         }
 
@@ -495,24 +535,27 @@ private:
             }
 
             const std::size_t joint_i = iter->second;
+            const double sign = (mirror && isMirroredJoint(joint_i)) ? -1.0 : 1.0;
             if (msg_i < msg.position.size()) {
-                command.q[joint_i] = static_cast<float>(msg.position[msg_i]);
+                command.q[joint_i] = static_cast<float>(sign * msg.position[msg_i]);
             }
             if (msg_i < msg.velocity.size()) {
-                command.dq[joint_i] = static_cast<float>(msg.velocity[msg_i]);
+                command.dq[joint_i] = static_cast<float>(sign * msg.velocity[msg_i]);
             }
             if (msg_i < msg.effort.size()) {
-                command.tau[joint_i] = static_cast<float>(msg.effort[msg_i]);
+                command.tau[joint_i] = static_cast<float>(sign * msg.effort[msg_i]);
             }
         }
     }
 
     template <typename T>
-    void copyByIndex(const std::vector<double>& source, std::array<T, kNumSdkJoints>& target)
+    void copyByIndex(const std::vector<double>& source, std::array<T, kNumSdkJoints>& target,
+                     const bool mirror)
     {
         const std::size_t count = std::min(source.size(), kNumRosJoints);
         for (std::size_t i = 0; i < count; ++i) {
-            target[i] = static_cast<T>(source[i]);
+            const double sign = (mirror && isMirroredJoint(i)) ? -1.0 : 1.0;
+            target[i] = static_cast<T>(sign * source[i]);
         }
     }
 
